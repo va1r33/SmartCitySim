@@ -9,10 +9,10 @@ SmartCitySim is an interactive web-based smart city simulation platform designed
 
 Users construct a tile-based city, activate smart-city interventions, and observe real-time changes in traffic congestion, CO₂ emissions, energy consumption, population growth, and citizen happiness.
 
-This project is developed as a **graduation thesis in Computer Engineering at Dongseo University** and serves as both:
+This project is developed as a **graduation project** and serves as both:
 
-• an educational sustainability simulator  
-• a research foundation for future AI-driven urban simulation
+• an educational sustainability simulator that helps users understand trade-offs between transport, climate, and livability
+• a research foundation for future AI-driven urban simulation, integrating IoT + AI + gamification in urban planning
 
 ---
 
@@ -176,8 +176,7 @@ Future work will include:
 
 # Author
 
-Valerie Tan Ying Ying  
-Department of Computer Engineering  
+Valerie Tan Ying Ying   
 Dongseo University  
 
 Graduation Thesis Project – 2026
