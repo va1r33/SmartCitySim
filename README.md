@@ -140,22 +140,99 @@ The simulation includes four progressive scenarios:
 
 
 SmartCitySim/
+├── src/
 │
-├── frontend/
-│ ├── components/
-│ │ └── smartcity/
-│ │ ├── TopHUD.jsx
-│ │ ├── BuildToolbar.jsx
-│ │ ├── CityGrid.jsx
-│ │ ├── RightPanel.jsx
-│ │ └── BottomBar.jsx
-│ │
-│ └── SmartCityApp.js
+│   ├── api/
+│   │   └── smartCityClient.js
+│   │
+│   ├── components/
+│   │
+│   │   ├── smartcity/
+│   │   │   ├── BottomBar.jsx
+│   │   │   ├── BuildToolbar.jsx
+│   │   │   ├── CarAgents.jsx
+│   │   │   ├── CityGrid.jsx
+│   │   │   ├── RightPanel.jsx
+│   │   │   ├── SimulationEngine.jsx
+│   │   │   └── TopHUD.jsx
+│   │   │
+│   │   └── ui/
+│   │       ├── accordion.jsx
+│   │       ├── alert-dialog.jsx
+│   │       ├── alert.jsx
+│   │       ├── aspect-ratio.jsx
+│   │       ├── avatar.jsx
+│   │       ├── badge.jsx
+│   │       ├── breadcrumb.jsx
+│   │       ├── button.jsx
+│   │       ├── calendar.jsx
+│   │       ├── card.jsx
+│   │       ├── carousel.jsx
+│   │       ├── chart.jsx
+│   │       ├── checkbox.jsx
+│   │       ├── collapsible.jsx
+│   │       ├── command.jsx
+│   │       ├── context-menu.jsx
+│   │       ├── dialog.jsx
+│   │       ├── drawer.jsx
+│   │       ├── dropdown-menu.jsx
+│   │       ├── form.jsx
+│   │       ├── hover-card.jsx
+│   │       ├── input-otp.jsx
+│   │       ├── input.jsx
+│   │       ├── label.jsx
+│   │       ├── menubar.jsx
+│   │       ├── navigation-menu.jsx
+│   │       ├── pagination.jsx
+│   │       ├── popover.jsx
+│   │       ├── progress.jsx
+│   │       ├── radio-group.jsx
+│   │       ├── resizable.jsx
+│   │       ├── scroll-area.jsx
+│   │       ├── select.jsx
+│   │       ├── separator.jsx
+│   │       ├── sheet.jsx
+│   │       ├── sidebar.jsx
+│   │       ├── skeleton.jsx
+│   │       ├── slider.jsx
+│   │       ├── sonner.jsx
+│   │       ├── switch.jsx
+│   │       ├── table.jsx
+│   │       ├── tabs.jsx
+│   │       ├── textarea.jsx
+│   │       ├── toast.jsx
+│   │       ├── toaster.jsx
+│   │       ├── toggle-group.jsx
+│   │       ├── toggle.jsx
+│   │       ├── tooltip.jsx
+│   │       └── use-toast.jsx
 │
-├── backend/
-│ └── app.py
+│   ├── hooks/
+│   │   └── use-mobile.jsx
 │
-└── README.md
+│   ├── lib/
+│   │   └── utils.js
+│
+│   ├── pages/
+│   │   └── SmartCitySim.jsx
+│
+│   ├── utils/
+│   │   └── index.ts
+│
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+│
+├── .gitignore
+├── eslint.config.js
+├── index.html
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── README.md
+├── tailwind.config.js
+└── toaster.jsx
+└── vite.config.js
 
 
 ---
