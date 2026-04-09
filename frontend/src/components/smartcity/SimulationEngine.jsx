@@ -13,6 +13,80 @@ export const TILE_TYPES = {
 
 export const GRID_SIZE = 40;
 
+// ── TILE METRIC CONTRIBUTIONS (for hover tooltips) ──────────────────────────
+export const TILE_CONTRIBUTIONS = {
+    residential: {
+        label: 'Residential',
+        emoji: '🏠',
+        effects: [
+            { metric: 'Population', delta: '+5', color: '#16a34a' },
+            { metric: 'Energy', delta: '+2 MW', color: '#dc2626' },
+            { metric: 'Traffic', delta: '+0.8', color: '#dc2626' },
+            { metric: 'CO₂', delta: '+0.5', color: '#dc2626' },
+        ],
+    },
+    commercial: {
+        label: 'Commercial',
+        emoji: '🏢',
+        effects: [
+            { metric: 'Energy', delta: '+3 MW', color: '#dc2626' },
+            { metric: 'Traffic', delta: '+1.2', color: '#dc2626' },
+            { metric: 'CO₂', delta: '+3', color: '#dc2626' },
+        ],
+    },
+    industrial: {
+        label: 'Industrial',
+        emoji: '🏭',
+        effects: [
+            { metric: 'CO₂', delta: '+6', color: '#dc2626' },
+            { metric: 'Energy', delta: '+5 MW', color: '#dc2626' },
+            { metric: 'Traffic', delta: '+2×adj', color: '#dc2626' },
+            { metric: 'Happiness', delta: '−2', color: '#dc2626' },
+            { metric: 'Flood Risk', delta: '+2', color: '#dc2626' },
+        ],
+    },
+    park: {
+        label: 'Park',
+        emoji: '🌳',
+        effects: [
+            { metric: 'CO₂', delta: '−5', color: '#16a34a' },
+            { metric: 'Happiness', delta: '+3', color: '#16a34a' },
+            { metric: 'Flood Risk', delta: '−4', color: '#16a34a' },
+        ],
+    },
+    solar: {
+        label: 'Solar Farm',
+        emoji: '☀️',
+        effects: [
+            { metric: 'CO₂', delta: '−8', color: '#16a34a' },
+            { metric: 'Energy (offset)', delta: '−4 MW', color: '#16a34a' },
+            { metric: 'Flood Risk', delta: '−0.5', color: '#16a34a' },
+        ],
+    },
+    transit: {
+        label: 'Bus Stop',
+        emoji: '🚌',
+        effects: [
+            { metric: 'Happiness', delta: '+4', color: '#16a34a' },
+            { metric: 'Traffic', delta: '−2', color: '#16a34a' },
+        ],
+    },
+    road: {
+        label: 'Road',
+        emoji: '🛣️',
+        effects: [
+            { metric: 'Traffic', delta: '+1.5', color: '#dc2626' },
+            { metric: 'CO₂ (indirect)', delta: '+0.4×traffic', color: '#dc2626' },
+            { metric: 'Flood Risk', delta: '+0.3', color: '#dc2626' },
+        ],
+    },
+    empty: {
+        label: 'Empty',
+        emoji: '',
+        effects: [],
+    },
+};
+
 // ── DEFAULT CITY TEMPLATE ───────────────────────────────────────────────────
 export function createDefaultGrid() {
     const g = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill('empty'));
@@ -68,14 +142,42 @@ function getIndustryDensity(grid) {
     return density;
 }
 
+// ── RESIDENTIAL CLUSTER DENSITY PENALTY ────────────────────────────────────
+// If a residential tile has 4+ adjacent residential neighbours, traffic
+// grows super-linearly — forces players to think about spacing, not just count.
+function getResidentialClusterPenalty(grid) {
+    let penalty = 0;
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            if (grid[r][c] !== 'residential') continue;
+            let adjRes = 0;
+            for (const [dr, dc] of dirs) {
+                const nr = r + dr, nc = c + dc;
+                if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && grid[nr][nc] === 'residential') adjRes++;
+            }
+            // Penalty kicks in at 4+ adjacent residential tiles
+            if (adjRes >= 4) penalty += (adjRes - 3) * 1.8;
+        }
+    }
+    return penalty;
+}
+
 // ── METRICS ─────────────────────────────────────────────────────────────────
-export function calculateMetrics(grid, iotSystems) {
+export function calculateMetrics(grid, iotSystems, cascadeModifiers = {}) {
     const counts = countTiles(grid);
     const indDensity = getIndustryDensity(grid);
+    const resPenalty = getResidentialClusterPenalty(grid);
     const total = GRID_SIZE * GRID_SIZE;
 
     // --- Energy / CO₂ (Scenario 1) ---
-    let trafficRaw = (counts.road * 1.5 + indDensity * 2 + counts.commercial * 1.2 + counts.residential * 0.8);
+    let trafficRaw = (
+        counts.road * 1.5 +
+        indDensity * 2 +
+        counts.commercial * 1.2 +
+        counts.residential * 0.8 +
+        resPenalty                   // density penalty adds to traffic
+    );
     let energyMW = counts.residential * 2 + counts.commercial * 3 + counts.industrial * 5;
     let co2Raw = counts.industrial * 6 + trafficRaw * 0.4 - counts.park * 5 - counts.solar * 8;
 
@@ -85,11 +187,10 @@ export function calculateMetrics(grid, iotSystems) {
     let population = counts.residential * 5;
 
     // --- Renewable share (Scenario 1) ---
-    const solarCapacity = counts.solar * 4; // MW per solar tile
+    const solarCapacity = counts.solar * 4;
     const renewableShare = Math.min(100, Math.round((solarCapacity / Math.max(1, energy)) * 100));
 
     // --- Happiness (Scenario 2) ---
-    // Parks + transit improve happiness; industrial + high traffic hurts it
     let happiness = 50
         + counts.park * 3
         + counts.transit * 4
@@ -98,7 +199,6 @@ export function calculateMetrics(grid, iotSystems) {
     happiness = Math.min(100, Math.max(0, happiness));
 
     // --- Flood Risk (Scenario 3) ---
-    // Parks absorb water; industrial + road increase runoff; low-lying residential hurts
     let floodRisk = 50
         + counts.industrial * 2
         + counts.road * 0.3
@@ -106,11 +206,15 @@ export function calculateMetrics(grid, iotSystems) {
         - counts.solar * 0.5;
     floodRisk = Math.min(100, Math.max(0, Math.round(floodRisk)));
 
-    // Estimated damage (Scenario 3)
-    const estimatedDamage = Math.round((floodRisk / 100) * 50); // up to $50M
+    const estimatedDamage = Math.round((floodRisk / 100) * 50);
 
-    // --- IoT modifiers ---
-    if (iotSystems.smartTraffic) traffic *= 0.80;
+    // --- IoT modifiers with DIMINISHING RETURNS ---
+    // Traffic Ctrl loses effectiveness when there are too many roads to manage.
+    if (iotSystems.smartTraffic) {
+        const roadOverload = Math.max(0, counts.road - 20);
+        const diminish = Math.max(0.5, 1 - roadOverload * 0.015); // weakens up to 50% at 53+ roads
+        traffic *= (0.80 * diminish + (1 - diminish));            // blended reduction
+    }
     if (iotSystems.ecoMode) energy *= 0.85;
     if (iotSystems.smartGrid) energy *= 0.90;
     if (iotSystems.publicAwareness) co2 *= 0.88;
@@ -121,9 +225,14 @@ export function calculateMetrics(grid, iotSystems) {
         co2 *= 0.93;
     }
 
-    // Happiness also responds to IoT
     if (iotSystems.smartTraffic) happiness = Math.min(100, happiness + 10);
     if (iotSystems.emergencyBroadcast) happiness = Math.min(100, happiness + 8);
+
+    // --- Cascade event modifiers (temporary) ---
+    if (cascadeModifiers.trafficDelta) traffic = Math.min(100, Math.max(0, traffic + cascadeModifiers.trafficDelta));
+    if (cascadeModifiers.happinessDelta) happiness = Math.min(100, Math.max(0, happiness + cascadeModifiers.happinessDelta));
+    if (cascadeModifiers.floodDelta) floodRisk = Math.min(100, Math.max(0, floodRisk + cascadeModifiers.floodDelta));
+    if (cascadeModifiers.co2Delta) co2 = Math.min(100, Math.max(0, co2 + cascadeModifiers.co2Delta));
 
     return {
         traffic: Math.round(traffic),
@@ -135,6 +244,154 @@ export function calculateMetrics(grid, iotSystems) {
         floodRisk: Math.round(floodRisk),
         estimatedDamage,
     };
+}
+
+// ── CITY SCORE (0–100 composite weighted formula) ───────────────────────────
+// Weighted sum across all key metrics — higher is better.
+// Thesis original contribution: documented weighting rationale.
+export function calcCityScore(metrics, level) {
+    const scenarioId = level?.scenario ?? 1;
+
+    // Base weights (always active)
+    const co2Score = Math.max(0, 100 - metrics.co2);          // lower CO₂ = better
+    const trafficScore = Math.max(0, 100 - metrics.traffic);      // lower traffic = better
+    const energyScore = Math.max(0, 100 - Math.min(100, metrics.energy / 2)); // normalized
+    const popScore = Math.min(100, metrics.population / 25);  // up to 2500 pop = 100
+
+    // Scenario-specific bonus weights
+    const happinessScore = scenarioId >= 2 ? metrics.happiness : 50;
+    const floodScore = scenarioId >= 3 ? Math.max(0, 100 - metrics.floodRisk) : 100;
+    const renewableScore = metrics.renewableShare;
+
+    // Weights sum to 1.0
+    const score =
+        co2Score * 0.20 +
+        trafficScore * 0.18 +
+        energyScore * 0.12 +
+        popScore * 0.12 +
+        happinessScore * 0.16 +
+        floodScore * 0.12 +
+        renewableScore * 0.10;
+
+    return Math.round(Math.max(0, Math.min(100, score)));
+}
+
+// ── FORECAST (client-side linear regression proxy) ──────────────────────────
+// Uses the last N metric snapshots to extrapolate values 5 ticks ahead.
+// Thesis claim: "ML prediction endpoint" — this is the visible AI layer
+// until the Flask regression model is wired up.
+export function forecastMetrics(history, horizon = 5) {
+    if (!history || history.length < 3) return null;
+
+    const n = Math.min(history.length, 10); // use up to last 10 snapshots
+    const recent = history.slice(-n);
+
+    const forecast = {};
+    const keys = ['co2', 'traffic', 'energy', 'happiness', 'floodRisk'];
+
+    for (const key of keys) {
+        const vals = recent.map((m, i) => ({ x: i, y: m[key] ?? 0 }));
+        // Least-squares linear regression
+        const sumX = vals.reduce((s, p) => s + p.x, 0);
+        const sumY = vals.reduce((s, p) => s + p.y, 0);
+        const sumXY = vals.reduce((s, p) => s + p.x * p.y, 0);
+        const sumX2 = vals.reduce((s, p) => s + p.x * p.x, 0);
+        const denom = n * sumX2 - sumX * sumX;
+        const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+        const intercept = (sumY - slope * sumX) / n;
+        const predicted = intercept + slope * (n - 1 + horizon);
+        forecast[key] = Math.round(Math.max(0, Math.min(200, predicted)));
+    }
+
+    return forecast;
+}
+
+// ── CASCADE EVENTS ──────────────────────────────────────────────────────────
+// Fires at every 10th tick. Returns an event object or null.
+export const CASCADE_EVENTS = [
+    {
+        id: 'heatwave',
+        label: '🌡️ Heat Wave',
+        description: 'Extreme heat spikes flood risk and energy demand for 5 ticks.',
+        modifiers: { floodDelta: 10, co2Delta: 5 },
+        duration: 5,
+        severity: 'warning',
+    },
+    {
+        id: 'green_initiative',
+        label: '🌱 Green Initiative',
+        description: 'City-wide sustainability drive boosts happiness and cuts CO₂ for 5 ticks.',
+        modifiers: { happinessDelta: 8, co2Delta: -6 },
+        duration: 5,
+        severity: 'success',
+    },
+    {
+        id: 'storm',
+        label: '⛈️ Storm Warning',
+        description: 'Heavy rain increases flood risk for 5 ticks. Parks help absorb runoff.',
+        modifiers: { floodDelta: 15, happinessDelta: -5 },
+        duration: 5,
+        severity: 'danger',
+    },
+    {
+        id: 'tech_summit',
+        label: '🤖 Tech Summit',
+        description: 'Innovation event draws visitors — traffic spikes but happiness rises.',
+        modifiers: { trafficDelta: 8, happinessDelta: 10 },
+        duration: 5,
+        severity: 'info',
+    },
+    {
+        id: 'power_shortage',
+        label: '⚡ Power Shortage',
+        description: 'Grid stress event — happiness drops until energy is stabilised.',
+        modifiers: { happinessDelta: -10, co2Delta: 8 },
+        duration: 5,
+        severity: 'danger',
+    },
+    {
+        id: 'clean_air_day',
+        label: '💨 Clean Air Day',
+        description: 'Voluntary car-free day reduces traffic and CO₂ briefly.',
+        modifiers: { trafficDelta: -10, co2Delta: -8, happinessDelta: 5 },
+        duration: 5,
+        severity: 'success',
+    },
+];
+
+export function pickCascadeEvent(tick) {
+    if (tick === 0 || tick % 10 !== 0) return null;
+    const idx = Math.floor((tick / 10 - 1) % CASCADE_EVENTS.length);
+    return { ...CASCADE_EVENTS[idx], startTick: tick };
+}
+
+// ── CONTEXT-SENSITIVE HINTS ─────────────────────────────────────────────────
+export function getContextHints(grid, metrics, level) {
+    const counts = countTiles(grid);
+    const hints = [];
+
+    if (counts.residential > 0 && counts.road === 0)
+        hints.push('🛣️ Residential areas generate traffic — connect them with roads first.');
+    if (counts.residential >= 5 && counts.park === 0)
+        hints.push('🌳 Add parks near residential zones to cut CO₂ and boost happiness.');
+    if (metrics.co2 > 50 && counts.solar === 0)
+        hints.push('☀️ Solar farms slash CO₂ by −8 each. Place them away from each other.');
+    if (metrics.traffic > 35 && counts.transit === 0)
+        hints.push('🚌 Bus stops near residential zones cut traffic and raise happiness +4 each.');
+    if (metrics.floodRisk > 50 && counts.park < 3)
+        hints.push('🌊 Flood risk is high — each park absorbs −4 flood risk. Build more.');
+    if (counts.industrial > 0 && counts.park === 0)
+        hints.push('🏭 Industrial zones raise flood risk +2 each. Buffer with parks.');
+    if (counts.solar >= 2 && !level.systems.includes('ecoMode') === false)
+        hints.push('🌿 Enable Eco Mode in SmartThings IoT to cut energy use by 15%.');
+    if (metrics.happiness < 50)
+        hints.push('😟 Happiness is low. Add parks (+3), bus stops (+4), and fewer industrial zones.');
+    if (metrics.population < 50)
+        hints.push('👥 Build residential zones — you need at least 50 population to pass any scenario.');
+    if (counts.residential > 8 && counts.road > 20)
+        hints.push('📊 Large grid detected — cluster your commercial zones near road intersections.');
+
+    return hints.length > 0 ? hints : ['🏙️ Keep building — balance zones, roads, and green infrastructure to meet your mandate.'];
 }
 
 // ── ROAD GRAPH for car agents ───────────────────────────────────────────────

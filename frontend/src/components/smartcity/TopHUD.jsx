@@ -1,53 +1,131 @@
-import React from 'react';
-import { Wind, Car, Zap, Users, CheckCircle2, Sun, Smile, Droplets } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { Wind, Car, Zap, Users, CheckCircle2, Sun, Smile, Droplets, Activity, BookOpen } from 'lucide-react';
 import { checkMandateAchieved } from './SimulationEngine';
 
-const Chip = ({ icon: Icon, label, value, unit, color, bg }) => (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: bg }}>
-        <Icon className="w-3.5 h-3.5" style={{ color }} />
-        <span className="text-[10px] text-slate-400 hidden lg:block">{label}</span>
-        <span className="text-xs font-bold tabular-nums" style={{ color }}>{value}{unit}</span>
-    </div>
-);
+// ── ANIMATED METRIC CHIP ─────────────────────────────────────────────────────
+// Flashes green on improvement, red on worsening, then fades back to neutral.
+function AnimatedChip({ icon: Icon, label, value, unit, forecast }) {
+    const prevRef = useRef(value);
+    const [flash, setFlash] = useState(null); // 'up' | 'down' | null
 
-export default function TopHUD({ metrics, currentLevel, isRunning, tickCount }) {
+    // Metrics where LOWER is better (co2, traffic, energy, floodRisk)
+    // Metrics where HIGHER is better (population, renewableShare, happiness)
+    // We infer from the unit / label — passed as `higherIsBetter` prop instead
+    // (see usage below).
+
+    useEffect(() => {
+        if (prevRef.current === value) return;
+        // Trigger flash
+        setFlash(value < prevRef.current ? 'down' : 'up');
+        prevRef.current = value;
+        const t = setTimeout(() => setFlash(null), 900);
+        return () => clearTimeout(t);
+    }, [value]);
+
+    const flashStyle = flash === 'down'
+        ? { background: 'rgba(34,197,94,0.12)', borderColor: '#22c55e' }
+        : flash === 'up'
+            ? { background: 'rgba(239,68,68,0.08)', borderColor: '#ef4444' }
+            : {};
+
+    const valueColor = flash === 'down'
+        ? '#16a34a'
+        : flash === 'up'
+            ? '#dc2626'
+            : '#1f2937';
+
+    return (
+        <div
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-gray-200/80 bg-white shadow-sm transition-all duration-300"
+            style={{ ...flashStyle, transition: 'background 0.3s, border-color 0.3s' }}
+        >
+            <Icon className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+            <div className="flex flex-col leading-none">
+                <span className="text-[8.5px] text-gray-400 uppercase tracking-widest hidden lg:block font-medium">{label}</span>
+                <span
+                    className="text-[13px] font-semibold tabular-nums transition-colors duration-300"
+                    style={{ color: valueColor }}
+                >
+                    {value}<span className="text-[10px] font-normal ml-0.5 text-gray-400">{unit}</span>
+                </span>
+                {/* ML forecast row */}
+                {forecast !== undefined && forecast !== null && (
+                    <span className="text-[8.5px] tabular-nums mt-0.5" style={{ color: '#6b7280' }}>
+                        ↗ {forecast}{unit}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function TopHUD({ metrics, currentLevel, isRunning, tickCount, onOpenManual, forecast }) {
     const achieved = checkMandateAchieved(metrics, currentLevel);
     const scenarioId = currentLevel.scenario;
 
     return (
-        <div className="bg-[#0d1424]/95 border-b border-[#1e293b] px-3 py-2 flex items-center gap-2 shrink-0 backdrop-blur-sm">
+        <div className="bg-white border-b border-gray-100 px-5 py-3 flex items-center gap-3 shrink-0 shadow-sm">
             {/* Brand */}
-            <div className="flex items-center gap-2 mr-2 shrink-0">
-                <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-teal-400 animate-pulse' : 'bg-slate-600'}`} />
-                <span className="text-teal-400 font-bold text-xs tracking-[0.2em] uppercase hidden sm:block">SmartCitySim</span>
-                <span className="text-[10px] text-slate-600 hidden md:block">v1.0</span>
+            <div className="flex items-center gap-3 mr-1 shrink-0">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-2xl bg-gray-900 flex items-center justify-center shadow-sm">
+                        <Activity className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="hidden sm:flex flex-col leading-none">
+                        <span className="text-gray-900 font-bold text-[13px] tracking-tight">SmartCitySim</span>
+                        <span className="text-[9px] text-gray-400 uppercase tracking-widest font-medium">Urban Simulator</span>
+                    </div>
+                </div>
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-semibold uppercase tracking-widest ${isRunning
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                        : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
+                    {isRunning ? 'Live' : 'Paused'}
+                </div>
             </div>
 
-            <div className="w-px h-5 bg-[#1e293b] shrink-0" />
+            <div className="w-px h-8 bg-gray-100 shrink-0" />
 
-            {/* Metrics chips */}
-            <div className="flex items-center gap-1.5 flex-1 flex-wrap">
-                <Chip icon={Wind} label="CO₂" value={metrics.co2} unit="%" color="#ef4444" bg="rgba(239,68,68,0.08)" />
-                <Chip icon={Car} label="Traffic" value={metrics.traffic} unit="%" color="#f59e0b" bg="rgba(245,158,11,0.08)" />
-                <Chip icon={Zap} label="Energy" value={metrics.energy} unit="MW" color="#3b82f6" bg="rgba(59,130,246,0.08)" />
-                <Chip icon={Users} label="Pop" value={metrics.population} unit="" color="#22c55e" bg="rgba(34,197,94,0.08)" />
-                {scenarioId >= 1 && <Chip icon={Sun} label="Renew" value={metrics.renewableShare} unit="%" color="#fbbf24" bg="rgba(251,191,36,0.08)" />}
-                {scenarioId >= 2 && <Chip icon={Smile} label="Happy" value={metrics.happiness} unit="%" color="#a78bfa" bg="rgba(167,139,250,0.08)" />}
-                {scenarioId >= 3 && <Chip icon={Droplets} label="Flood" value={metrics.floodRisk} unit="%" color="#60a5fa" bg="rgba(96,165,250,0.08)" />}
+            {/* Metric chips — animated on change */}
+            <div className="flex items-center gap-2 flex-1 flex-wrap">
+                <AnimatedChip icon={Wind} label="CO₂" value={metrics.co2} unit="%" forecast={forecast?.co2} />
+                <AnimatedChip icon={Car} label="Traffic" value={metrics.traffic} unit="%" forecast={forecast?.traffic} />
+                <AnimatedChip icon={Zap} label="Energy" value={metrics.energy} unit="MW" forecast={forecast?.energy} />
+                <AnimatedChip icon={Users} label="Population" value={metrics.population} unit="" />
+                {scenarioId >= 1 && <AnimatedChip icon={Sun} label="Renewable" value={metrics.renewableShare} unit="%" />}
+                {scenarioId >= 2 && <AnimatedChip icon={Smile} label="Happiness" value={metrics.happiness} unit="%" forecast={forecast?.happiness} />}
+                {scenarioId >= 3 && <AnimatedChip icon={Droplets} label="Flood Risk" value={metrics.floodRisk} unit="%" forecast={forecast?.floodRisk} />}
             </div>
 
-            {/* Level + mandate badge */}
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-                <span className="text-[10px] text-slate-500 hidden md:block">
-                    S{scenarioId} · {currentLevel.label}
-                </span>
+            {/* ML badge — shown when forecast is available */}
+            {forecast && (
+                <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-blue-100 bg-blue-50 text-[9px] font-semibold text-blue-500 uppercase tracking-widest shrink-0">
+                    🤖 ML +5 turns
+                </div>
+            )}
+
+            {/* Manual button + Level */}
+            <button
+                onClick={onOpenManual}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-all shrink-0"
+                title="User Manual"
+            >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-semibold hidden sm:block">Manual</span>
+            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+                <div className="hidden md:flex flex-col items-end leading-none">
+                    <span className="text-[11px] font-semibold text-gray-800">{currentLevel.label}</span>
+                    <span className="text-[9px] text-gray-400 font-medium">Scenario {scenarioId} · Tick {tickCount}</span>
+                </div>
                 {achieved && (
-                    <div className="flex items-center gap-1 bg-teal-500/15 border border-teal-500/30 px-2 py-1 rounded-lg">
-                        <CheckCircle2 className="w-3 h-3 text-teal-400" />
-                        <span className="text-[10px] font-bold text-teal-400 hidden sm:block">Mandate Achieved!</span>
+                    <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-2xl">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-[11px] font-semibold text-emerald-600 hidden sm:block">Mandate Achieved</span>
                     </div>
                 )}
-                <span className="text-[9px] text-slate-600 tabular-nums hidden md:block">Tick {tickCount}</span>
             </div>
         </div>
     );

@@ -4,24 +4,29 @@ import BuildToolbar from '../components/smartcity/BuildToolbar';
 import CityGrid from '../components/smartcity/CityGrid';
 import RightPanel from '../components/smartcity/RightPanel';
 import BottomBar from '../components/smartcity/BottomBar';
+import UserManual from '../components/smartcity/UserManual';
 import {
     createDefaultGrid,
     createEmptyGrid,
     calculateMetrics,
     LEVELS,
     checkMandateAchieved,
-    countTiles,
+    pickCascadeEvent,
+    forecastMetrics,
 } from '../components/smartcity/SimulationEngine';
 import { initCars, stepCars } from '../components/smartcity/CarAgents';
-import { simulateCity } from '../api/smartCityClient';   // <-- our API client
 
 const INITIAL_CAR_COUNT = 14;
+// How many metric snapshots to keep for ML regression
+const HISTORY_MAX = 40;
 
 export default function SmartCitySim() {
     const [grid, setGrid] = useState(() => createDefaultGrid());
     const [selectedTool, setSelectedTool] = useState('residential');
-    const [speed] = useState(1);          // speed not used in car loop – we can keep it for future
+    const [isRunning, setIsRunning] = useState(false);
+    const [speed, setSpeed] = useState(1);
     const [currentLevelId, setCurrentLevelId] = useState(1);
+    const [tickCount, setTickCount] = useState(0);
     const [cars, setCars] = useState([]);
     const [iotSystems, setIotSystems] = useState({
         ecoMode: false,
@@ -31,25 +36,28 @@ export default function SmartCitySim() {
         smartGrid: false,
         predictiveOptimization: false,
     });
+    const [metrics, setMetrics] = useState({ traffic: 0, energy: 0, co2: 0, population: 0 });
+    const [showManual, setShowManual] = useState(true);
 
-    // Initial metrics with all fields from SimulationEngine
-    const [metrics, setMetrics] = useState({
-        traffic: 0,
-        energy: 0,
-        co2: 0,
-        population: 0,
-        renewableShare: 0,
-        happiness: 0,
-        floodRisk: 0,
-        estimatedDamage: 0,
-    });
+    // ── Cascade event state ──────────────────────────────────────────────────
+    // activeCascade: the current event object (or null)
+    // cascadeModifiers: the metric deltas applied while the event is active
+    const [activeCascade, setActiveCascade] = useState(null);
+    const [cascadeModifiers, setCascadeModifiers] = useState({});
+    const cascadeExpiryRef = useRef(null); // tick at which the event ends
+
+    // ── Metric history for ML forecast ──────────────────────────────────────
+    const [metricHistory, setMetricHistory] = useState([]);
+    const [forecast, setForecast] = useState(null);
 
     const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
 
     const gridRef = useRef(grid);
     const iotRef = useRef(iotSystems);
+    const cascadeModRef = useRef(cascadeModifiers);
     gridRef.current = grid;
     iotRef.current = iotSystems;
+    cascadeModRef.current = cascadeModifiers;
 
     // Init cars on mount
     useEffect(() => {
@@ -57,19 +65,71 @@ export default function SmartCitySim() {
         setCars(initCars(g, INITIAL_CAR_COUNT));
     }, []);
 
-    // Update metrics when grid or IoT changes (local preview)
+    // Recalculate metrics whenever grid, IoT, or cascade modifiers change
     useEffect(() => {
-        setMetrics(calculateMetrics(grid, iotSystems));
-    }, [grid, iotSystems]);
+        const m = calculateMetrics(grid, iotSystems, cascadeModifiers);
+        setMetrics(m);
+    }, [grid, iotSystems, cascadeModifiers]);
 
-    // Car animation loop (independent of "Run")
+    // ── Simulation tick loop ─────────────────────────────────────────────────
     useEffect(() => {
+        if (!isRunning) return;
+        const ms = 800 / speed;
+
         const interval = setInterval(() => {
-            setCars(prev => stepCars(prev, gridRef.current));
-        }, 800 / speed);   // adjust speed as needed (default 1 → 800ms)
-        return () => clearInterval(interval);
-    }, [speed]);
+            setTickCount(prev => {
+                const nextTick = prev + 1;
 
+                // ── 1. Cascade event lifecycle ───────────────────────────────
+                // Check if current cascade has expired
+                if (activeCascade && cascadeExpiryRef.current !== null && nextTick >= cascadeExpiryRef.current) {
+                    setActiveCascade(null);
+                    setCascadeModifiers({});
+                    cascadeExpiryRef.current = null;
+                }
+
+                // Check if a new cascade event fires at this tick
+                const newEvent = pickCascadeEvent(nextTick);
+                if (newEvent && !activeCascade) {
+                    setActiveCascade(newEvent);
+                    setCascadeModifiers(newEvent.modifiers);
+                    cascadeExpiryRef.current = nextTick + newEvent.duration;
+                }
+
+                return nextTick;
+            });
+
+            // ── 2. Recalculate metrics ───────────────────────────────────────
+            const m = calculateMetrics(gridRef.current, iotRef.current, cascadeModRef.current);
+            setMetrics(m);
+
+            // ── 3. Log to history for ML forecast ────────────────────────────
+            setMetricHistory(hist => {
+                const updated = [...hist, m].slice(-HISTORY_MAX);
+                // Re-run forecast every 5 ticks (enough data)
+                if (updated.length >= 3 && updated.length % 5 === 0) {
+                    setForecast(forecastMetrics(updated, 5));
+                }
+                return updated;
+            });
+
+            // ── 4. Step cars ─────────────────────────────────────────────────
+            setCars(prev => stepCars(prev, gridRef.current));
+
+        }, ms);
+
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRunning, speed, activeCascade]);
+
+    // ── Recalculate forecast when history grows outside the tick loop ────────
+    useEffect(() => {
+        if (metricHistory.length >= 3) {
+            setForecast(forecastMetrics(metricHistory, 5));
+        }
+    }, [metricHistory.length]);
+
+    // ── Handlers ─────────────────────────────────────────────────────────────
     const handlePlaceTile = useCallback((row, col, type) => {
         setGrid(prev => {
             if (prev[row][col] === type) return prev;
@@ -86,6 +146,13 @@ export default function SmartCitySim() {
     const handleReset = useCallback(() => {
         const g = createDefaultGrid();
         setGrid(g);
+        setIsRunning(false);
+        setTickCount(0);
+        setMetricHistory([]);
+        setForecast(null);
+        setActiveCascade(null);
+        setCascadeModifiers({});
+        cascadeExpiryRef.current = null;
         setIotSystems({
             ecoMode: false,
             publicAwareness: false,
@@ -100,42 +167,24 @@ export default function SmartCitySim() {
     const handleEraseAll = useCallback(() => {
         setGrid(createEmptyGrid());
         setCars([]);
+        setMetricHistory([]);
+        setForecast(null);
     }, []);
-
-    // API call – triggered by the "Run" button
-    const runSimulation = useCallback(async () => {
-        const counts = countTiles(grid);
-        const layout = {
-            layout: "player_city",
-            buildings: [
-                { type: "residential", count: counts.residential },
-                { type: "commercial", count: counts.commercial },
-                { type: "industrial", count: counts.industrial },
-                { type: "park", count: counts.park },
-                { type: "road", count: counts.road },
-                { type: "solar", count: counts.solar || 0 },
-                { type: "transit", count: counts.transit || 0 }
-            ],
-            smartthings_mode: Object.keys(iotSystems).filter(k => iotSystems[k])[0] || ""
-        };
-        try {
-            const result = await simulateCity(layout);
-            setMetrics(prev => ({ ...prev, ...result }));
-        } catch (err) {
-            console.error("Simulation failed", err);
-        }
-    }, [grid, iotSystems]);
 
     const achieved = checkMandateAchieved(metrics, currentLevel);
     const nextLevel = LEVELS.find(l => l.id === currentLevelId + 1);
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-[#080d18] text-white overflow-hidden select-none">
+        <div className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden select-none">
+            {showManual && <UserManual onClose={() => setShowManual(false)} />}
+
             <TopHUD
                 metrics={metrics}
                 currentLevel={currentLevel}
-                isRunning={false}           // we no longer have a running state – can be removed from TopHUD if desired
-                tickCount={0}               // we don't use tick count anymore
+                isRunning={isRunning}
+                tickCount={tickCount}
+                onOpenManual={() => setShowManual(true)}
+                forecast={forecast}
             />
 
             <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -147,7 +196,7 @@ export default function SmartCitySim() {
                     co2Level={metrics.co2}
                     floodRisk={metrics.floodRisk}
                     cars={cars}
-                    isRunning={false}
+                    isRunning={isRunning}
                 />
                 <div className="hidden md:flex">
                     <RightPanel
@@ -156,33 +205,39 @@ export default function SmartCitySim() {
                         onToggle={handleToggleIoT}
                         currentLevel={currentLevel}
                         grid={grid}
+                        activeCascade={activeCascade}
                     />
                 </div>
             </div>
 
             <BottomBar
-                onRun={runSimulation}                 // new prop – Run button triggers API
+                isRunning={isRunning}
+                onToggleRun={() => setIsRunning(r => !r)}
                 onReset={handleReset}
                 onEraseAll={handleEraseAll}
                 speed={speed}
-                onSpeedChange={() => { }}              // speed is now fixed; you can implement later
+                onSpeedChange={setSpeed}
                 currentLevelId={currentLevelId}
                 onLevelChange={setCurrentLevelId}
                 metrics={metrics}
                 selectedTool={selectedTool}
+                tickCount={tickCount}
             />
 
+            {/* Level-up / win banners */}
             {achieved && nextLevel && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999]">
-                    <div className="bg-[#0d1424] border-2 border-teal-400/70 rounded-xl px-6 py-4 shadow-2xl flex items-center gap-5 animate-pulse"
-                        style={{ boxShadow: '0 0 40px rgba(20,184,166,0.4)' }}>
+                    <div
+                        className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl flex items-center gap-5"
+                        style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+                    >
                         <div>
-                            <div className="text-teal-400 font-bold text-base">🎉 {currentLevel.label} Mandate Achieved!</div>
-                            <div className="text-slate-300 text-xs mt-1">{currentLevel.unlocks}</div>
+                            <div className="text-gray-900 font-bold text-base">🎉 {currentLevel.label} Mandate Achieved!</div>
+                            <div className="text-gray-400 text-xs mt-1">{currentLevel.unlocks}</div>
                         </div>
                         <button
                             onClick={() => setCurrentLevelId(nextLevel.id)}
-                            className="px-5 py-2.5 bg-teal-500/30 border border-teal-400 text-teal-300 text-sm font-bold rounded-lg hover:bg-teal-500/50 transition-all whitespace-nowrap"
+                            className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-700 transition-all whitespace-nowrap shadow-sm"
                         >
                             → Advance to Level {nextLevel.id}
                         </button>
@@ -191,10 +246,12 @@ export default function SmartCitySim() {
             )}
             {achieved && !nextLevel && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999]">
-                    <div className="bg-[#0d1424] border-2 border-yellow-400/70 rounded-xl px-6 py-4 shadow-2xl text-center"
-                        style={{ boxShadow: '0 0 40px rgba(234,179,8,0.4)' }}>
-                        <div className="text-yellow-400 font-bold text-base">🏆 You've mastered the Predictive Metropolis!</div>
-                        <div className="text-slate-300 text-xs mt-1">All mandates complete. SmartCity fully optimized.</div>
+                    <div
+                        className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl text-center"
+                        style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+                    >
+                        <div className="text-gray-900 font-bold text-base">🏆 You've mastered the Predictive Metropolis!</div>
+                        <div className="text-gray-400 text-xs mt-1">All mandates complete. SmartCity fully optimized.</div>
                     </div>
                 </div>
             )}
