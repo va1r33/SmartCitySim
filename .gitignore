@@ -7,6 +7,8 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.vite/
+*.tsbuildinfo
 
 # Python
 __pycache__/
@@ -22,6 +24,22 @@ dist/
 build/
 *.log
 *.pkl
+*.pickle
+*.h5
+*.joblib
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+.tox/
+.mypy_cache/
+instance/
+*.db
+*.sqlite3
+*.sqlite
+*.db-journal
+*.db-shm
+*.db-wal
 
 # IDE
 .vscode/
@@ -29,7 +47,25 @@ build/
 *.swp
 *.swo
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+*~
+*.orig
+*.rej
+.#*
+\#*#
+*.bak
+*.tmp
+*.temp
 
-# Build outputs
-dist/
-build/
+# OS / Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archives (optional)
+*.zip
+*.tar.gz
+*.rar
+*.7z

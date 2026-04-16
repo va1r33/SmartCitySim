@@ -13,22 +13,26 @@ import {
     checkMandateAchieved,
     pickCascadeEvent,
     forecastMetrics,
+    countTiles,
+    calcCityScore,
 } from '../components/smartcity/SimulationEngine';
 import { initCars, stepCars } from '../components/smartcity/CarAgents';
+import { logData, saveGame } from '../api/smartCityClient';
 
 const INITIAL_CAR_COUNT = 14;
-// How many metric snapshots to keep for ML regression
 const HISTORY_MAX = 40;
+const AUTOSAVE_EVERY = 30;
 
-export default function SmartCitySim() {
-    const [grid, setGrid] = useState(() => createDefaultGrid());
+export default function SmartCitySim({ user, token, loadedSave, onLogout, onBackToSaves }) {
+    // Restore from save slot if provided
+    const [grid, setGrid] = useState(() => loadedSave?.grid_state ?? createDefaultGrid());
     const [selectedTool, setSelectedTool] = useState('residential');
     const [isRunning, setIsRunning] = useState(false);
     const [speed, setSpeed] = useState(1);
-    const [currentLevelId, setCurrentLevelId] = useState(1);
-    const [tickCount, setTickCount] = useState(0);
+    const [currentLevelId, setCurrentLevelId] = useState(loadedSave?.current_level ?? 1);
+    const [tickCount, setTickCount] = useState(loadedSave?.tick_count ?? 0);
     const [cars, setCars] = useState([]);
-    const [iotSystems, setIotSystems] = useState({
+    const [iotSystems, setIotSystems] = useState(loadedSave?.iot_systems ?? {
         ecoMode: false,
         publicAwareness: false,
         smartTraffic: false,
@@ -37,18 +41,21 @@ export default function SmartCitySim() {
         predictiveOptimization: false,
     });
     const [metrics, setMetrics] = useState({ traffic: 0, energy: 0, co2: 0, population: 0 });
-    const [showManual, setShowManual] = useState(true);
+    const [showManual, setShowManual] = useState(!loadedSave); // skip manual if resuming
 
-    // ── Cascade event state ──────────────────────────────────────────────────
-    // activeCascade: the current event object (or null)
-    // cascadeModifiers: the metric deltas applied while the event is active
+    // Cascade events
     const [activeCascade, setActiveCascade] = useState(null);
     const [cascadeModifiers, setCascadeModifiers] = useState({});
-    const cascadeExpiryRef = useRef(null); // tick at which the event ends
+    const cascadeExpiryRef = useRef(null);
 
-    // ── Metric history for ML forecast ──────────────────────────────────────
+    // ML history and forecasts
     const [metricHistory, setMetricHistory] = useState([]);
     const [forecast, setForecast] = useState(null);
+    const [mlPredictions, setMlPredictions] = useState(null);
+
+    // Save state
+    const [saveId, setSaveId] = useState(loadedSave?.id ?? null);
+    const [saveStatus, setSaveStatus] = useState('');
 
     const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
 
@@ -59,77 +66,106 @@ export default function SmartCitySim() {
     iotRef.current = iotSystems;
     cascadeModRef.current = cascadeModifiers;
 
-    // Init cars on mount
+    // Init cars
     useEffect(() => {
-        const g = createDefaultGrid();
+        const g = loadedSave?.grid_state ?? createDefaultGrid();
         setCars(initCars(g, INITIAL_CAR_COUNT));
     }, []);
 
-    // Recalculate metrics whenever grid, IoT, or cascade modifiers change
+    // Recalc metrics
     useEffect(() => {
         const m = calculateMetrics(grid, iotSystems, cascadeModifiers);
         setMetrics(m);
     }, [grid, iotSystems, cascadeModifiers]);
 
-    // ── Simulation tick loop ─────────────────────────────────────────────────
+    // Simulation tick loop
     useEffect(() => {
         if (!isRunning) return;
         const ms = 800 / speed;
-
         const interval = setInterval(() => {
             setTickCount(prev => {
                 const nextTick = prev + 1;
-
-                // ── 1. Cascade event lifecycle ───────────────────────────────
-                // Check if current cascade has expired
                 if (activeCascade && cascadeExpiryRef.current !== null && nextTick >= cascadeExpiryRef.current) {
                     setActiveCascade(null);
                     setCascadeModifiers({});
                     cascadeExpiryRef.current = null;
                 }
-
-                // Check if a new cascade event fires at this tick
                 const newEvent = pickCascadeEvent(nextTick);
                 if (newEvent && !activeCascade) {
                     setActiveCascade(newEvent);
                     setCascadeModifiers(newEvent.modifiers);
                     cascadeExpiryRef.current = nextTick + newEvent.duration;
                 }
-
                 return nextTick;
             });
 
-            // ── 2. Recalculate metrics ───────────────────────────────────────
             const m = calculateMetrics(gridRef.current, iotRef.current, cascadeModRef.current);
             setMetrics(m);
 
-            // ── 3. Log to history for ML forecast ────────────────────────────
             setMetricHistory(hist => {
                 const updated = [...hist, m].slice(-HISTORY_MAX);
-                // Re-run forecast every 5 ticks (enough data)
                 if (updated.length >= 3 && updated.length % 5 === 0) {
                     setForecast(forecastMetrics(updated, 5));
                 }
                 return updated;
             });
 
-            // ── 4. Step cars ─────────────────────────────────────────────────
             setCars(prev => stepCars(prev, gridRef.current));
-
         }, ms);
-
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isRunning, speed, activeCascade]);
 
-    // ── Recalculate forecast when history grows outside the tick loop ────────
     useEffect(() => {
-        if (metricHistory.length >= 3) {
-            setForecast(forecastMetrics(metricHistory, 5));
-        }
+        if (metricHistory.length >= 3) setForecast(forecastMetrics(metricHistory, 5));
     }, [metricHistory.length]);
 
-    // ── Handlers ─────────────────────────────────────────────────────────────
+    // Log data for training
+    useEffect(() => {
+        if (!isRunning) return;
+        const counts = countTiles(grid);
+        logData(tickCount, metrics, {
+            residential: counts.residential,
+            commercial: counts.commercial,
+            industrial: counts.industrial,
+            park: counts.park,
+            solar: counts.solar,
+            road: counts.road,
+            transit: counts.transit,
+        });
+    }, [tickCount, metrics, grid, isRunning]);
+
+    // Fetch ML predictions from backend (Random Forest)
+    useEffect(() => {
+        const fetchPredictions = async () => {
+            const counts = countTiles(grid);
+            try {
+                const res = await fetch('http://localhost:5001/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ grid_counts: counts })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    setMlPredictions({ co2: data.co2, traffic: data.traffic });
+                } else {
+                    setMlPredictions(null);
+                }
+            } catch (err) {
+                console.error('Prediction fetch failed', err);
+                setMlPredictions(null);
+            }
+        };
+        fetchPredictions();
+    }, [grid]);
+
+    // Autosave (every 30 ticks)
+    useEffect(() => {
+        if (!user || !token) return;
+        if (tickCount === 0 || tickCount % AUTOSAVE_EVERY !== 0) return;
+        handleSave();
+    }, [tickCount]);
+
+    // Handlers
     const handlePlaceTile = useCallback((row, col, type) => {
         setGrid(prev => {
             if (prev[row][col] === type) return prev;
@@ -171,6 +207,29 @@ export default function SmartCitySim() {
         setForecast(null);
     }, []);
 
+    const handleSave = useCallback(async () => {
+        if (!user || !token) return;
+        setSaveStatus('saving');
+        const score = calcCityScore(metrics, currentLevel);
+        try {
+            const res = await saveGame({
+                saveId,
+                name: `${user.username}'s city`,
+                grid,
+                currentLevelId,
+                tickCount,
+                cityScore: score,
+                iotSystems,
+            });
+            if (res.save_id) setSaveId(res.save_id);
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus(''), 2000);
+        } catch (err) {
+            console.error('Save failed', err);
+            setSaveStatus('');
+        }
+    }, [user, token, saveId, grid, currentLevelId, tickCount, iotSystems, metrics, currentLevel]);
+
     const achieved = checkMandateAchieved(metrics, currentLevel);
     const nextLevel = LEVELS.find(l => l.id === currentLevelId + 1);
 
@@ -185,6 +244,12 @@ export default function SmartCitySim() {
                 tickCount={tickCount}
                 onOpenManual={() => setShowManual(true)}
                 forecast={forecast}
+                mlPredictions={mlPredictions}
+                user={user}
+                saveStatus={saveStatus}
+                onSave={user ? handleSave : null}
+                onBackToSaves={onBackToSaves}
+                onLogout={onLogout}
             />
 
             <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -224,20 +289,16 @@ export default function SmartCitySim() {
                 tickCount={tickCount}
             />
 
-            {/* Level-up / win banners */}
             {achieved && nextLevel && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999]">
-                    <div
-                        className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl flex items-center gap-5"
-                        style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-                    >
+                    <div className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl flex items-center gap-5">
                         <div>
                             <div className="text-gray-900 font-bold text-base">🎉 {currentLevel.label} Mandate Achieved!</div>
                             <div className="text-gray-400 text-xs mt-1">{currentLevel.unlocks}</div>
                         </div>
                         <button
                             onClick={() => setCurrentLevelId(nextLevel.id)}
-                            className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-700 transition-all whitespace-nowrap shadow-sm"
+                            className="px-5 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-700 transition-all"
                         >
                             → Advance to Level {nextLevel.id}
                         </button>
@@ -246,10 +307,7 @@ export default function SmartCitySim() {
             )}
             {achieved && !nextLevel && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999]">
-                    <div
-                        className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl text-center"
-                        style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-                    >
+                    <div className="bg-white border border-gray-200 rounded-2xl px-6 py-4 shadow-xl text-center">
                         <div className="text-gray-900 font-bold text-base">🏆 You've mastered the Predictive Metropolis!</div>
                         <div className="text-gray-400 text-xs mt-1">All mandates complete. SmartCity fully optimized.</div>
                     </div>

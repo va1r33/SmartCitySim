@@ -178,7 +178,8 @@ export function calculateMetrics(grid, iotSystems, cascadeModifiers = {}) {
         counts.residential * 0.8 +
         resPenalty                   // density penalty adds to traffic
     );
-    let energyMW = counts.residential * 2 + counts.commercial * 3 + counts.industrial * 5;
+    let energyMW = counts.residential * 2 + counts.commercial * 3 + counts.industrial * 5 - counts.solar * 4;
+    energyMW = Math.max(0, energyMW);
     let co2Raw = counts.industrial * 6 + trafficRaw * 0.4 - counts.park * 5 - counts.solar * 8;
 
     let traffic = Math.min(100, Math.max(0, (trafficRaw / (total * 1.2)) * 100));
@@ -462,8 +463,8 @@ export const LEVELS = [
         label: 'Expert',
         scenario: 4,
         title: '🌐 Predictive Metropolis',
-        description: 'CO₂ ≤ 15% · Traffic ≤ 12% · Energy ≤ 40MW · Population ≥ 2000 · Happiness ≥ 85%',
-        criteria: { co2: 15, traffic: 12, energy: 40, population_min: 2000, happiness_min: 85 },
+        description: 'CO₂ ≤ 20% · Traffic ≤ 25% · Energy ≤ 180MW · Population ≥ 800 · Happiness ≥ 85%',
+        criteria: { co2: 20, traffic: 25, energy: 180, population_min: 800, happiness_min: 85 },
         systems: ['smartTraffic', 'ecoMode', 'publicAwareness', 'emergencyBroadcast', 'smartGrid', 'predictiveOptimization'],
         unlocks: null,
         tip: 'Enable Predictive Optimization and balance all city systems for the ultimate smart city.',

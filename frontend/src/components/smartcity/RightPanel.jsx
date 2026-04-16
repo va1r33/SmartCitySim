@@ -318,7 +318,7 @@ export default function RightPanel({ metrics, iotSystems, onToggle, currentLevel
             </div>
 
             {/* Hint ticker — pinned at bottom */}
-            <div className="mt-auto">
+            <div className="sticky bottom-0 bg-white">
                 <HintTicker hints={hints} />
             </div>
         </div>

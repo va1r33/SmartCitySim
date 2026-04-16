@@ -2,7 +2,7 @@
 
 import { getRoadTiles, buildRoadGraph, GRID_SIZE } from './SimulationEngine';
 
-const CAR_COLORS = ['#00e5cc', '#3b82f6', '#f59e0b', '#a78bfa', '#fb7185', '#34d399'];
+const CAR_COLORS = ['#6b7280', '#9ca3af', '#374151', '#4b5563', '#1f2937', '#d1d5db'];
 
 function randomFrom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
@@ -86,7 +86,7 @@ export function stepCars(cars, grid) {
             }
         }
 
-        // New destination
+        // Need new destination?
         if (pathIndex >= path.length || path.length === 0) {
             if (waitTicks > 0) {
                 return { ...car, px, py, r, c, path, pathIndex, waitTicks: waitTicks - 1 };

@@ -315,7 +315,6 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
                 className="rounded-2xl border border-gray-200 cursor-crosshair"
                 style={{
                     maxWidth: '100%', maxHeight: '100%',
-                    imageRendering: 'pixelated',
                     boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)',
                 }}
                 onMouseDown={onMouseDown}

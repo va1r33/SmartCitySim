@@ -3,19 +3,12 @@ import { Wind, Car, Zap, Users, CheckCircle2, Sun, Smile, Droplets, Activity, Bo
 import { checkMandateAchieved } from './SimulationEngine';
 
 // ── ANIMATED METRIC CHIP ─────────────────────────────────────────────────────
-// Flashes green on improvement, red on worsening, then fades back to neutral.
 function AnimatedChip({ icon: Icon, label, value, unit, forecast }) {
     const prevRef = useRef(value);
     const [flash, setFlash] = useState(null); // 'up' | 'down' | null
 
-    // Metrics where LOWER is better (co2, traffic, energy, floodRisk)
-    // Metrics where HIGHER is better (population, renewableShare, happiness)
-    // We infer from the unit / label — passed as `higherIsBetter` prop instead
-    // (see usage below).
-
     useEffect(() => {
         if (prevRef.current === value) return;
-        // Trigger flash
         setFlash(value < prevRef.current ? 'down' : 'up');
         prevRef.current = value;
         const t = setTimeout(() => setFlash(null), 900);
@@ -48,7 +41,6 @@ function AnimatedChip({ icon: Icon, label, value, unit, forecast }) {
                 >
                     {value}<span className="text-[10px] font-normal ml-0.5 text-gray-400">{unit}</span>
                 </span>
-                {/* ML forecast row */}
                 {forecast !== undefined && forecast !== null && (
                     <span className="text-[8.5px] tabular-nums mt-0.5" style={{ color: '#6b7280' }}>
                         ↗ {forecast}{unit}
@@ -59,7 +51,20 @@ function AnimatedChip({ icon: Icon, label, value, unit, forecast }) {
     );
 }
 
-export default function TopHUD({ metrics, currentLevel, isRunning, tickCount, onOpenManual, forecast }) {
+export default function TopHUD({
+    metrics,
+    currentLevel,
+    isRunning,
+    tickCount,
+    onOpenManual,
+    forecast,
+    mlPredictions,
+    user,
+    saveStatus,
+    onSave,
+    onBackToSaves,
+    onLogout,
+}) {
     const achieved = checkMandateAchieved(metrics, currentLevel);
     const scenarioId = currentLevel.scenario;
 
@@ -77,8 +82,8 @@ export default function TopHUD({ metrics, currentLevel, isRunning, tickCount, on
                     </div>
                 </div>
                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-semibold uppercase tracking-widest ${isRunning
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
-                        : 'border-gray-200 bg-gray-50 text-gray-400'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                    : 'border-gray-200 bg-gray-50 text-gray-400'
                     }`}>
                     <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-gray-300'}`} />
                     {isRunning ? 'Live' : 'Paused'}
@@ -98,14 +103,21 @@ export default function TopHUD({ metrics, currentLevel, isRunning, tickCount, on
                 {scenarioId >= 3 && <AnimatedChip icon={Droplets} label="Flood Risk" value={metrics.floodRisk} unit="%" forecast={forecast?.floodRisk} />}
             </div>
 
-            {/* ML badge — shown when forecast is available */}
+            {/* ML badge — shown when forecast is available (client-side) */}
             {forecast && (
                 <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-blue-100 bg-blue-50 text-[9px] font-semibold text-blue-500 uppercase tracking-widest shrink-0">
                     🤖 ML +5 turns
                 </div>
             )}
 
-            {/* Manual button + Level */}
+            {/* NEW: ML predictions from backend (Random Forest) */}
+            {mlPredictions && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-purple-100 bg-purple-50 text-[9px] font-semibold text-purple-600 uppercase tracking-widest shrink-0">
+                    🤖 ML Next: CO₂ {mlPredictions.co2}% / Traffic {mlPredictions.traffic}%
+                </div>
+            )}
+
+            {/* Manual button */}
             <button
                 onClick={onOpenManual}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-all shrink-0"
@@ -115,6 +127,34 @@ export default function TopHUD({ metrics, currentLevel, isRunning, tickCount, on
                 <span className="text-[10px] font-semibold hidden sm:block">Manual</span>
             </button>
 
+            {/* User & Save Controls (only shown when logged in) */}
+            {user && (
+                <div className="flex items-center gap-2 shrink-0 bg-gray-50/80 rounded-xl px-3 py-1.5 border border-gray-100">
+                    <span className="text-xs text-gray-600 font-medium">👤 {user.username}</span>
+                    {onSave && (
+                        <button
+                            onClick={onSave}
+                            className="text-xs bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded-lg transition-colors"
+                        >
+                            {saveStatus === 'saving' ? '💾 Saving...' : saveStatus === 'saved' ? '✓ Saved' : '💾 Save'}
+                        </button>
+                    )}
+                    <button
+                        onClick={onBackToSaves}
+                        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg"
+                    >
+                        📂 Saves
+                    </button>
+                    <button
+                        onClick={onLogout}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg"
+                    >
+                        🚪 Logout
+                    </button>
+                </div>
+            )}
+
+            {/* Level & Tick Info */}
             <div className="flex items-center gap-2 shrink-0">
                 <div className="hidden md:flex flex-col items-end leading-none">
                     <span className="text-[11px] font-semibold text-gray-800">{currentLevel.label}</span>

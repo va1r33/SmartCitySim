@@ -14,9 +14,9 @@ const TOOLS = [
 
 export default function BuildToolbar({ selectedTool, onSelectTool }) {
     return (
-        <div className="w-14 md:w-16 bg-[#0d1424]/95 border-r border-[#1e293b] flex flex-col items-center py-3 gap-1.5 shrink-0">
-            <span className="text-[8px] text-slate-600 uppercase tracking-wider mb-1 hidden md:block">Build</span>
-            {TOOLS.map(({ id, icon: Icon, label, color, emoji }) => {
+        <div className="w-14 md:w-16 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-1.5 shrink-0 shadow-sm">
+            <span className="text-[7.5px] text-gray-300 uppercase tracking-[0.18em] mb-1 hidden md:block font-semibold">Build</span>
+            {TOOLS.map(({ id, icon: Icon, label, emoji }) => {
                 const active = selectedTool === id;
                 return (
                     <button
@@ -24,21 +24,16 @@ export default function BuildToolbar({ selectedTool, onSelectTool }) {
                         onClick={() => onSelectTool(id)}
                         title={label}
                         className={`
-              w-10 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5
-              transition-all duration-150 border
+              w-11 h-11 rounded-2xl flex flex-col items-center justify-center gap-0.5
+              transition-all duration-200 border
               ${active
-                                ? 'border-opacity-50 scale-105'
-                                : 'border-transparent hover:bg-[#1e293b]'
+                                ? 'bg-gray-900 border-gray-900 scale-105 shadow-md'
+                                : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
                             }
             `}
-                        style={active ? {
-                            backgroundColor: `${color}18`,
-                            borderColor: `${color}60`,
-                            boxShadow: `0 0 12px ${color}25`,
-                        } : {}}
                     >
-                        <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-[8px] font-bold tracking-wider" style={{ color: active ? color : '#475569' }}>{label}</span>
+                        <span className="text-sm leading-none">{emoji}</span>
+                        <span className={`text-[7px] font-bold tracking-wider mt-0.5 ${active ? 'text-white' : 'text-gray-400'}`}>{label}</span>
                     </button>
                 );
             })}
