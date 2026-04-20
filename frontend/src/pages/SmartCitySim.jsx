@@ -24,7 +24,6 @@ const HISTORY_MAX = 40;
 const AUTOSAVE_EVERY = 30;
 
 export default function SmartCitySim({ user, token, loadedSave, onLogout, onBackToSaves }) {
-    // Restore from save slot if provided
     const [grid, setGrid] = useState(() => loadedSave?.grid_state ?? createDefaultGrid());
     const [selectedTool, setSelectedTool] = useState('residential');
     const [isRunning, setIsRunning] = useState(false);
@@ -41,19 +40,16 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         predictiveOptimization: false,
     });
     const [metrics, setMetrics] = useState({ traffic: 0, energy: 0, co2: 0, population: 0 });
-    const [showManual, setShowManual] = useState(!loadedSave); // skip manual if resuming
+    const [showManual, setShowManual] = useState(!loadedSave);
 
-    // Cascade events
     const [activeCascade, setActiveCascade] = useState(null);
     const [cascadeModifiers, setCascadeModifiers] = useState({});
     const cascadeExpiryRef = useRef(null);
 
-    // ML history and forecasts
     const [metricHistory, setMetricHistory] = useState([]);
     const [forecast, setForecast] = useState(null);
     const [mlPredictions, setMlPredictions] = useState(null);
 
-    // Save state
     const [saveId, setSaveId] = useState(loadedSave?.id ?? null);
     const [saveStatus, setSaveStatus] = useState('');
 
@@ -66,19 +62,16 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
     iotRef.current = iotSystems;
     cascadeModRef.current = cascadeModifiers;
 
-    // Init cars
     useEffect(() => {
         const g = loadedSave?.grid_state ?? createDefaultGrid();
         setCars(initCars(g, INITIAL_CAR_COUNT));
     }, []);
 
-    // Recalc metrics
     useEffect(() => {
         const m = calculateMetrics(grid, iotSystems, cascadeModifiers);
         setMetrics(m);
     }, [grid, iotSystems, cascadeModifiers]);
 
-    // Simulation tick loop
     useEffect(() => {
         if (!isRunning) return;
         const ms = 800 / speed;
@@ -119,7 +112,6 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         if (metricHistory.length >= 3) setForecast(forecastMetrics(metricHistory, 5));
     }, [metricHistory.length]);
 
-    // Log data for training
     useEffect(() => {
         if (!isRunning) return;
         const counts = countTiles(grid);
@@ -134,7 +126,6 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         });
     }, [tickCount, metrics, grid, isRunning]);
 
-    // Fetch ML predictions from backend (Random Forest)
     useEffect(() => {
         const fetchPredictions = async () => {
             const counts = countTiles(grid);
@@ -158,14 +149,12 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         fetchPredictions();
     }, [grid]);
 
-    // Autosave (every 30 ticks)
     useEffect(() => {
         if (!user || !token) return;
         if (tickCount === 0 || tickCount % AUTOSAVE_EVERY !== 0) return;
         handleSave();
     }, [tickCount]);
 
-    // Handlers
     const handlePlaceTile = useCallback((row, col, type) => {
         setGrid(prev => {
             if (prev[row][col] === type) return prev;
@@ -263,7 +252,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
                     cars={cars}
                     isRunning={isRunning}
                 />
-                <div className="hidden md:flex">
+                <div className="hidden md:flex shrink-0">
                     <RightPanel
                         metrics={metrics}
                         iotSystems={iotSystems}

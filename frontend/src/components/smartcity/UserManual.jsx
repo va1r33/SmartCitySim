@@ -4,7 +4,6 @@ import { X, Home, Building2, Factory, TreePine, Sun, Bus, Route, Info, ChevronRi
 const PAGES = [
     {
         title: 'Welcome to SmartCitySim',
-        icon: '🏙️',
         content: (
             <div className="space-y-3">
                 <p className="text-gray-600 text-sm leading-relaxed">
@@ -31,7 +30,6 @@ const PAGES = [
     },
     {
         title: 'Zoning Rules',
-        icon: '📐',
         content: (
             <div className="space-y-3">
                 <p className="text-gray-500 text-xs mb-2">Real urban planning separates incompatible land uses. These rules are enforced:</p>
@@ -58,7 +56,6 @@ const PAGES = [
     },
     {
         title: 'How to Build',
-        icon: '🛠️',
         content: (
             <div className="space-y-3">
                 <div className="space-y-2">
@@ -84,7 +81,6 @@ const PAGES = [
     },
     {
         title: 'Scenarios & Metrics',
-        icon: '📊',
         content: (
             <div className="space-y-3">
                 <div className="space-y-2">

@@ -89,7 +89,6 @@ function TileTooltip({ tileType, position, canvasSize }) {
     const contrib = TILE_CONTRIBUTIONS[tileType];
     if (!contrib || contrib.effects.length === 0) return null;
 
-    // Keep tooltip within canvas bounds
     const tooltipW = 160;
     const tooltipEstH = 28 + contrib.effects.length * 20;
     let left = position.x + 12;
@@ -127,16 +126,20 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
     const [canvasSize, setCanvasSize] = useState(600);
     const [animPhase, setAnimPhase] = useState(0);
     const [violation, setViolation] = useState(null);
-    const [hoveredTile, setHoveredTile] = useState(null); // { row, col, type, x, y }
+    const [hoveredTile, setHoveredTile] = useState(null);
     const windowCacheRef = useRef({});
     const violationTimerRef = useRef(null);
 
+    // ── Canvas sizing – eliminate side gaps by using full width ──
     useEffect(() => {
         const update = () => {
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
-                const s = Math.min(rect.width, rect.height) - 4;
-                setCanvasSize(Math.max(200, s));
+                // Use full container width (minus small padding)
+                let size = rect.width - 8;
+                // Cap to avoid overly tall grid on very wide screens
+                size = Math.min(size, window.innerHeight - 100);
+                setCanvasSize(Math.max(200, size));
             }
         };
         update();
@@ -298,7 +301,6 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
         }
     };
 
-    // Scale canvas pixel coords to container coords for tooltip positioning
     const scale = canvasRef.current
         ? canvasRef.current.getBoundingClientRect().width / canvasSize
         : 1;
@@ -307,7 +309,7 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
         : null;
 
     return (
-        <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center p-3 overflow-hidden bg-gray-300 relative">
+        <div ref={containerRef} className="flex-1 flex flex-col items-center justify-center p-1 overflow-hidden bg-gray-300 relative">
             <canvas
                 ref={canvasRef}
                 width={canvasSize}
@@ -326,7 +328,6 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
                 onTouchEnd={onMouseUp}
             />
 
-            {/* Hover tooltip */}
             {hoveredTile && tooltipPos && !isDrawing && (
                 <TileTooltip
                     tileType={hoveredTile.type}
@@ -335,7 +336,6 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
                 />
             )}
 
-            {/* Zoning violation toast */}
             {violation && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 max-w-[90%] text-center pointer-events-none">
                     <span>⛔</span>

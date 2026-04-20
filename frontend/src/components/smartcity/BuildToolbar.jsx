@@ -14,8 +14,8 @@ const TOOLS = [
 
 export default function BuildToolbar({ selectedTool, onSelectTool }) {
     return (
-        <div className="w-14 md:w-16 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-1.5 shrink-0 shadow-sm">
-            <span className="text-[7.5px] text-gray-300 uppercase tracking-[0.18em] mb-1 hidden md:block font-semibold">Build</span>
+        <div className="w-16 md:w-20 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-1.5 shrink-0 shadow-sm">
+            <span className="text-[8px] text-gray-400 uppercase tracking-wider mb-1 hidden md:block font-semibold">BUILD</span>
             {TOOLS.map(({ id, icon: Icon, label, emoji }) => {
                 const active = selectedTool === id;
                 return (
@@ -24,16 +24,16 @@ export default function BuildToolbar({ selectedTool, onSelectTool }) {
                         onClick={() => onSelectTool(id)}
                         title={label}
                         className={`
-              w-11 h-11 rounded-2xl flex flex-col items-center justify-center gap-0.5
-              transition-all duration-200 border
-              ${active
+                            w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5
+                            transition-all duration-200 border
+                            ${active
                                 ? 'bg-gray-900 border-gray-900 scale-105 shadow-md'
                                 : 'border-transparent hover:bg-gray-50 hover:border-gray-200'
                             }
-            `}
+                        `}
                     >
-                        <span className="text-sm leading-none">{emoji}</span>
-                        <span className={`text-[7px] font-bold tracking-wider mt-0.5 ${active ? 'text-white' : 'text-gray-400'}`}>{label}</span>
+                        <span className="text-lg leading-none">{emoji}</span>
+                        <span className={`text-[8px] font-bold tracking-wider mt-0.5 ${active ? 'text-white' : 'text-gray-400'}`}>{label}</span>
                     </button>
                 );
             })}
