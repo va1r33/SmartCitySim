@@ -68,4 +68,7 @@ Desktop.ini
 *.zip
 *.tar.gz
 *.rar
-*.7z*.npy
+*.7z
+
+# NumPy arrays (large intermediate data)
+*.npy
