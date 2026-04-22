@@ -2,7 +2,15 @@
 
 import { getRoadTiles, buildRoadGraph, GRID_SIZE } from './SimulationEngine';
 
-const CAR_COLORS = ['#6b7280', '#9ca3af', '#374151', '#4b5563', '#1f2937', '#d1d5db'];
+// ── colour palette ─────────────────────────────────────────────────
+const CAR_COLORS = [
+    '#dc2626', // red-600
+    '#ef4444', // red-500
+    '#b91c1c', // red-700
+    '#f87171', // red-400
+    '#991b1b', // red-800
+    '#fca5a5', // red-300
+];
 
 function randomFrom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];

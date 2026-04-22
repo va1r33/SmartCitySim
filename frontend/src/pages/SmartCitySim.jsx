@@ -50,6 +50,10 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
     const [forecast, setForecast] = useState(null);
     const [mlPredictions, setMlPredictions] = useState(null);
 
+    // ── LSTM traffic prediction ──────────────────────────────────────────────
+    const [lastTrafficValues, setLastTrafficValues] = useState([]);
+    const [lstmPrediction, setLstmPrediction] = useState(null);
+
     const [saveId, setSaveId] = useState(loadedSave?.id ?? null);
     const [saveStatus, setSaveStatus] = useState('');
 
@@ -72,6 +76,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         setMetrics(m);
     }, [grid, iotSystems, cascadeModifiers]);
 
+    // Simulation tick loop
     useEffect(() => {
         if (!isRunning) return;
         const ms = 800 / speed;
@@ -112,6 +117,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         if (metricHistory.length >= 3) setForecast(forecastMetrics(metricHistory, 5));
     }, [metricHistory.length]);
 
+    // Log data for training
     useEffect(() => {
         if (!isRunning) return;
         const counts = countTiles(grid);
@@ -126,6 +132,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         });
     }, [tickCount, metrics, grid, isRunning]);
 
+    // Fetch Random Forest predictions
     useEffect(() => {
         const fetchPredictions = async () => {
             const counts = countTiles(grid);
@@ -149,6 +156,44 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         fetchPredictions();
     }, [grid]);
 
+    // ── LSTM: collect last 20 traffic values and call endpoint ───────────────
+    useEffect(() => {
+        if (metrics.traffic !== undefined && !isNaN(metrics.traffic)) {
+            setLastTrafficValues(prev => {
+                const updated = [...prev, metrics.traffic];
+                if (updated.length > 20) updated.shift();
+                return updated;
+            });
+        }
+    }, [metrics.traffic]);
+
+    useEffect(() => {
+        if (lastTrafficValues.length === 20) {
+            const fetchLSTM = async () => {
+                try {
+                    const res = await fetch('http://localhost:5001/predict_traffic_lstm', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ last_20_traffic: lastTrafficValues })
+                    });
+                    const data = await res.json();
+                    if (data.next_traffic !== undefined) {
+                        setLstmPrediction(Math.round(data.next_traffic));
+                    } else {
+                        setLstmPrediction(null);
+                    }
+                } catch (err) {
+                    console.error('LSTM prediction failed', err);
+                    setLstmPrediction(null);
+                }
+            };
+            fetchLSTM();
+        } else {
+            setLstmPrediction(null);
+        }
+    }, [lastTrafficValues]);
+
+    // Autosave
     useEffect(() => {
         if (!user || !token) return;
         if (tickCount === 0 || tickCount % AUTOSAVE_EVERY !== 0) return;
@@ -226,20 +271,24 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         <div className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden select-none">
             {showManual && <UserManual onClose={() => setShowManual(false)} />}
 
-            <TopHUD
-                metrics={metrics}
-                currentLevel={currentLevel}
-                isRunning={isRunning}
-                tickCount={tickCount}
-                onOpenManual={() => setShowManual(true)}
-                forecast={forecast}
-                mlPredictions={mlPredictions}
-                user={user}
-                saveStatus={saveStatus}
-                onSave={user ? handleSave : null}
-                onBackToSaves={onBackToSaves}
-                onLogout={onLogout}
-            />
+            {/* shrink-0 prevents the HUD from shrinking when content grows */}
+            <div className="shrink-0">
+                <TopHUD
+                    metrics={metrics}
+                    currentLevel={currentLevel}
+                    isRunning={isRunning}
+                    tickCount={tickCount}
+                    onOpenManual={() => setShowManual(true)}
+                    forecast={forecast}
+                    mlPredictions={mlPredictions}
+                    lstmPrediction={lstmPrediction}
+                    user={user}
+                    saveStatus={saveStatus}
+                    onSave={user ? handleSave : null}
+                    onBackToSaves={onBackToSaves}
+                    onLogout={onLogout}
+                />
+            </div>
 
             <div className="flex-1 flex min-h-0 overflow-hidden">
                 <BuildToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />

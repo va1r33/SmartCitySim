@@ -70,17 +70,70 @@ function drawTile(ctx, x, y, ts, type) {
     return drawZoneTile(ctx, x, y, ts, type);
 }
 
+// ── draw stylised car silhouette with wheels ────────────────────────────
 function drawCar(ctx, car, tileSize) {
     const x = car.px * tileSize;
     const y = car.py * tileSize;
-    const s = Math.max(2, tileSize * 0.26);
-    ctx.fillStyle = car.color;
-    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+    const w = Math.max(8, tileSize * 0.4);
+    const h = Math.max(5, tileSize * 0.25);
+    const left = x - w / 2;
+    const top = y - h / 2;
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.25)';
     ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    // Body gradient
+    const grad = ctx.createLinearGradient(left, top, left, top + h);
+    grad.addColorStop(0, car.color);
+    grad.addColorStop(1, '#991b1b');
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.roundRect(x - s / 2, y - s / 2, s, s, s * 0.3);
+    ctx.roundRect(left, top, w, h, 3);
     ctx.fill();
+
+    // Glossy highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.roundRect(left + 1, top + 1, w - 2, 1.5, 1);
+    ctx.fill();
+
+    // Reset shadow (so windows/wheels don't get double shadow)
+    ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Windows
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath();
+    ctx.roundRect(left + w * 0.2, top + 2, w * 0.25, h - 3, 1);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(left + w * 0.55, top + 2, w * 0.25, h - 3, 1);
+    ctx.fill();
+
+    // Headlight (front)
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.roundRect(left + w - 2, top + 2, 2, 2, 0.5);
+    ctx.fill();
+    // Taillight
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.roundRect(left + 0.5, top + 2, 2, 2, 0.5);
+    ctx.fill();
+
+    // Wheels
+    ctx.fillStyle = '#1f2937';
+    ctx.beginPath();
+    ctx.arc(left + w * 0.25, top + h - 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(left + w * 0.75, top + h - 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 // ── TOOLTIP COMPONENT ────────────────────────────────────────────────────────
@@ -130,14 +183,12 @@ export default function CityGrid({ grid, onPlaceTile, selectedTool, co2Level, fl
     const windowCacheRef = useRef({});
     const violationTimerRef = useRef(null);
 
-    // ── Canvas sizing – eliminate side gaps by using full width ──
+    // Canvas sizing – eliminate side gaps by using full width
     useEffect(() => {
         const update = () => {
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
-                // Use full container width (minus small padding)
                 let size = rect.width - 8;
-                // Cap to avoid overly tall grid on very wide screens
                 size = Math.min(size, window.innerHeight - 100);
                 setCanvasSize(Math.max(200, size));
             }

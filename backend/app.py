@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json, os, numpy as np, joblib
 import bcrypt
 import jwt
+from tensorflow.keras.models import load_model   # <-- added for LSTM
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://localhost:3000"])
@@ -55,15 +56,25 @@ class SimulationLog(db.Model):
 with app.app_context():
     db.create_all()
 
-# ======================== ML Models ========================
+# ======================== Random Forest Models ========================
 rf_co2 = rf_traffic = rf_energy = None
 try:
     rf_co2 = joblib.load('models/rf_co2.pkl')
     rf_traffic = joblib.load('models/rf_traffic.pkl')
     rf_energy = joblib.load('models/rf_energy.pkl')
-    print("Random Forest models loaded for /api/simulate")
+    print("✅ Random Forest models loaded for /api/simulate")
 except:
-    print("RF models not found, using fallback formulas")
+    print("⚠️ RF models not found, using fallback formulas")
+
+# ======================== LSTM Model ========================
+lstm_model = None
+traffic_scaler = None
+try:
+    lstm_model = load_model('models/traffic_lstm.h5', compile=False)
+    traffic_scaler = joblib.load('models/traffic_scaler.pkl')
+    print("✅ LSTM traffic model loaded")
+except Exception as e:
+    print(f"⚠️ LSTM model not found: {e}")
 
 # ======================== Helper Functions ========================
 def token_required(f):
@@ -261,6 +272,21 @@ def predict():
     else:
         return jsonify({"status": "model_not_trained"}), 503
 
+# ======================== LSTM Prediction Endpoint ========================
+@app.route('/predict_traffic_lstm', methods=['POST'])
+def predict_traffic_lstm():
+    data = request.get_json()
+    last_20 = data.get('last_20_traffic')
+    if not last_20 or len(last_20) != 20:
+        return jsonify({"error": "Need exactly 20 previous traffic values"}), 400
+
+    # Scale input
+    scaled = traffic_scaler.transform(np.array(last_20).reshape(-1, 1)).reshape(1, 20, 1)
+    pred_scaled = lstm_model.predict(scaled, verbose=0)
+    pred = traffic_scaler.inverse_transform(pred_scaled)[0, 0]
+    return jsonify({"next_traffic": float(pred)})
+
+# ======================== Data Logging & Export ========================
 @app.route('/log_data', methods=['POST'])
 def log_data():
     data = request.get_json()
