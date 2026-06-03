@@ -50,9 +50,9 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 | Client‑side linear regression | 5‑tick extrapolation (baseline) | – | Runs in browser |
 
 **Frontend ML badges:**  
-- 🤖 *Trend +5* – client‑side linear regression  
-- 🤖 *RF: CO₂ X% / Traffic Y%* – backend Random Forest  
-- 🧠 *LSTM next traffic: X%* – backend LSTM (Seoul‑calibrated)
+-  *Trend +5* – client‑side linear regression  
+-  *RF: CO₂ X% / Traffic Y%* – backend Random Forest  
+-  *LSTM next traffic: X%* – backend LSTM (Seoul‑calibrated)
 
 ---
 
