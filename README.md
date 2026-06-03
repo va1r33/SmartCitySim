@@ -135,31 +135,43 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate   # or `venv\Scripts\activate` on Windows
+source venv/bin/activate   # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 python app.py --port 5001
-Frontend Setup
-bash
+```
+
+Backend server runs at: http://localhost:5001
+
+### Frontend Setup
+
+```bash
 cd frontend
 npm install
 npm run dev
+```
+
 Open http://localhost:5173 – create an account or use guest mode.
 
-Future Work (planned after graduation)
-IoT‑aware Random Forest – retrain models with IoT flags (replace hard‑coded multipliers)
+---
 
-Ensemble fusion pipeline – combine RF + LSTM + rules‑based for multi‑model robustness
+## Future Work (planned after graduation)
 
-Deployment – Vercel (frontend) + Render (backend)
+- IoT-aware Random Forest – retrain models with IoT flags (replace hard-coded multipliers)
+- Ensemble fusion pipeline – combine RF + LSTM + rules-based forecasting for multi-model robustness
+- Deployment – Vercel (frontend) + Render (backend)
+- PostgreSQL + Redis – production scaling and caching
+- Public deployment for education and research
 
-PostgreSQL + Redis – production scaling and caching
+---
 
-Public deployment for education and research
+## Author
 
-Author
-Valerie Tan Ying Ying
-Dongseo University – Department of Computer Science & Game Development
+**Valerie Tan Ying Ying**  
+Dongseo University – Department of Computer Science & Game Development  
 Graduation Thesis Project – 2026
 
-License
+---
+
+## License
+
 Academic use only – all rights reserved.
