@@ -163,8 +163,6 @@ SmartCitySim/
 ├── .gitignore
 └── README.md
 
-text
-
 ---
 
 ## Running the Project Locally
