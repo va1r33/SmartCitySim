@@ -94,7 +94,7 @@ export function stepCars(cars, grid) {
             }
         }
 
-        // Need new destination?
+        // for new destination
         if (pathIndex >= path.length || path.length === 0) {
             if (waitTicks > 0) {
                 return { ...car, px, py, r, c, path, pathIndex, waitTicks: waitTicks - 1 };

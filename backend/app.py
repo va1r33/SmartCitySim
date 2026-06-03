@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import json, os, numpy as np, joblib
 import bcrypt
 import jwt
-from tensorflow.keras.models import load_model   # <-- added for LSTM
+import tensorflow as tf
+load_model = tf.keras.models.load_model
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://localhost:3000"])
@@ -62,9 +63,9 @@ try:
     rf_co2 = joblib.load('models/rf_co2.pkl')
     rf_traffic = joblib.load('models/rf_traffic.pkl')
     rf_energy = joblib.load('models/rf_energy.pkl')
-    print("✅ Random Forest models loaded for /api/simulate")
+    print("Random Forest models loaded for /api/simulate")
 except:
-    print("⚠️ RF models not found, using fallback formulas")
+    print("RF models not found, using fallback formulas")
 
 # ======================== LSTM Model ========================
 lstm_model = None
@@ -72,9 +73,9 @@ traffic_scaler = None
 try:
     lstm_model = load_model('models/traffic_lstm.h5', compile=False)
     traffic_scaler = joblib.load('models/traffic_scaler.pkl')
-    print("✅ LSTM traffic model loaded")
+    print("LSTM traffic model loaded")
 except Exception as e:
-    print(f"⚠️ LSTM model not found: {e}")
+    print(f"LSTM model not found: {e}")
 
 # ======================== Helper Functions ========================
 def token_required(f):
@@ -272,19 +273,64 @@ def predict():
     else:
         return jsonify({"status": "model_not_trained"}), 503
 
-# ======================== LSTM Prediction Endpoint ========================
+# ======================== LSTM Prediction Endpoint (UPDATED) ========================
 @app.route('/predict_traffic_lstm', methods=['POST'])
 def predict_traffic_lstm():
+    """
+    Expected JSON payload:
+    {
+        "traffic_sequence": [list of 20 previous traffic values (0-100)],
+        "simulated_hour": float (optional, currently not used but can be logged)
+    }
+    Returns:
+    {
+        "predicted_traffic": float,
+        "model_type": "seoul_calibrated" or "synthetic_fallback"
+    }
+    """
     data = request.get_json()
-    last_20 = data.get('last_20_traffic')
-    if not last_20 or len(last_20) != 20:
+    
+    # Support both key names for backward compatibility
+    traffic_seq = data.get('traffic_sequence') or data.get('last_20_traffic')
+    
+    if not traffic_seq or len(traffic_seq) != 20:
         return jsonify({"error": "Need exactly 20 previous traffic values"}), 400
-
-    # Scale input
-    scaled = traffic_scaler.transform(np.array(last_20).reshape(-1, 1)).reshape(1, 20, 1)
-    pred_scaled = lstm_model.predict(scaled, verbose=0)
-    pred = traffic_scaler.inverse_transform(pred_scaled)[0, 0]
-    return jsonify({"next_traffic": float(pred)})
+    
+    # If LSTM model is not loaded, return a simple fallback prediction
+    if lstm_model is None or traffic_scaler is None:
+        # Simple fallback: average of last 3 values + small noise
+        avg = sum(traffic_seq[-3:]) / 3
+        fallback = min(100, max(0, avg + np.random.randint(-5, 6)))
+        return jsonify({
+            "predicted_traffic": float(fallback),
+            "model_type": "synthetic_fallback"
+        })
+    
+    try:
+        # Scale input using the real-data scaler
+        input_array = np.array(traffic_seq).reshape(-1, 1)
+        scaled = traffic_scaler.transform(input_array).reshape(1, 20, 1)
+        
+        # Predict
+        pred_scaled = lstm_model.predict(scaled, verbose=0)
+        pred = traffic_scaler.inverse_transform(pred_scaled)[0, 0]
+        
+        # Clamp to reasonable range (0-100)
+        pred = max(0, min(100, pred))
+        
+        return jsonify({
+            "predicted_traffic": float(pred),
+            "model_type": "seoul_calibrated"
+        })
+    except Exception as e:
+        print(f"LSTM prediction error: {e}")
+        # Fallback on error
+        avg = sum(traffic_seq[-3:]) / 3
+        fallback = min(100, max(0, avg + np.random.randint(-3, 4)))
+        return jsonify({
+            "predicted_traffic": float(fallback),
+            "model_type": "error_fallback"
+        })
 
 # ======================== Data Logging & Export ========================
 @app.route('/log_data', methods=['POST'])

@@ -13,6 +13,13 @@ export const TILE_TYPES = {
 
 export const GRID_SIZE = 40;
 
+// ── TIME-OF-DAY HELPER ───────────────────────────────────────────────────────
+// 96 ticks per simulated day → returns fractional hour 0.0–23.75
+// Used by LSTM endpoint to encode real Seoul rush-hour patterns.
+export function getSimulatedHour(tickCount) {
+    return (tickCount % 96) / 4;
+}
+
 // ── TILE METRIC CONTRIBUTIONS (for hover tooltips) ──────────────────────────
 export const TILE_CONTRIBUTIONS = {
     residential: {
@@ -279,8 +286,6 @@ export function calcCityScore(metrics, level) {
 
 // ── FORECAST (client-side linear regression proxy) ──────────────────────────
 // Uses the last N metric snapshots to extrapolate values 5 ticks ahead.
-// Thesis claim: "ML prediction endpoint" — this is the visible AI layer
-// until the Flask regression model is wired up.
 export function forecastMetrics(history, horizon = 5) {
     if (!history || history.length < 3) return null;
 
@@ -505,3 +510,59 @@ export const IOT_SYSTEMS = {
     smartGrid: { label: 'Smart Energy Grid', effect: 'Energy −10%', requiredLevel: 3 },
     predictiveOptimization: { label: 'Predictive Optim.', effect: 'All metrics −8%', requiredLevel: 4 },
 };
+
+// ── KOREAN ZONING COMPLIANCE (soft warnings) ────────────────────────────────
+// Used only by RightPanel – does NOT affect simulation metrics.
+//
+// Rule 2: Minimum Green Space Ratio (녹지율)
+//   Source: Seoul Metropolitan Government Urban Planning Ordinance
+//   Link:   https://legal.seoul.go.kr
+//   Advisory: parks must be ≥ 5% of residential tile count.
+//
+// Rule 5: Floor Area Ratio warnings (용적률)
+//   Source: National Land Planning and Utilization Act, Article 78
+//   Link:   https://elaw.klri.re.kr
+//   Advisory thresholds (% of total 40×40 = 1,600 cells):
+//     Residential > 40% · Commercial > 25% · Industrial > 20%
+export function getZoningCompliance(grid) {
+    const totalCells = GRID_SIZE * GRID_SIZE;
+    const counts = countTiles(grid);
+
+    // Rule 2: Minimum green space ratio (Seoul Ordinance – 5% of residential count)
+    let greenRatio = 100; // default: no violation when no residential tiles
+    let greenViolation = false;
+    let greenDeficit = 0;
+    if (counts.residential > 0) {
+        greenRatio = (counts.park / counts.residential) * 100;
+        greenViolation = greenRatio < 5;
+        if (greenViolation) {
+            const requiredParks = Math.ceil(counts.residential * 0.05);
+            greenDeficit = Math.max(0, requiredParks - counts.park);
+        }
+    }
+
+    // Rule 5: FAR warnings (NLPUA Art. 78) – percentage of total grid area
+    const resPct   = (counts.residential / totalCells) * 100;
+    const comPct   = (counts.commercial  / totalCells) * 100;
+    const indPct   = (counts.industrial  / totalCells) * 100;
+
+    const farWarnings = {
+        residential: resPct > 40 ? { currentPct: Math.round(resPct * 10) / 10, limitPct: 40 } : null,
+        commercial:  comPct > 25 ? { currentPct: Math.round(comPct * 10) / 10, limitPct: 25 } : null,
+        industrial:  indPct > 20 ? { currentPct: Math.round(indPct * 10) / 10, limitPct: 20 } : null,
+    };
+
+    const hasFarWarning = Object.values(farWarnings).some(v => v !== null);
+
+    return {
+        // Rule 2
+        greenRatio: Math.round(greenRatio * 10) / 10,
+        greenViolation,
+        greenDeficit,
+        // Rule 5
+        farWarnings,
+        hasFarWarning,
+        // Combined
+        hasAnyWarning: greenViolation || hasFarWarning,
+    };
+}

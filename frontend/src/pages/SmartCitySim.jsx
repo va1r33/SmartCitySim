@@ -5,6 +5,7 @@ import CityGrid from '../components/smartcity/CityGrid';
 import RightPanel from '../components/smartcity/RightPanel';
 import BottomBar from '../components/smartcity/BottomBar';
 import UserManual from '../components/smartcity/UserManual';
+import ZoningToast from '../components/smartcity/ZoningToast';
 import {
     createDefaultGrid,
     createEmptyGrid,
@@ -15,6 +16,8 @@ import {
     forecastMetrics,
     countTiles,
     calcCityScore,
+    getSimulatedHour,
+    getZoningCompliance,
 } from '../components/smartcity/SimulationEngine';
 import { initCars, stepCars } from '../components/smartcity/CarAgents';
 import { logData, saveGame } from '../api/smartCityClient';
@@ -65,6 +68,9 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
     gridRef.current = grid;
     iotRef.current = iotSystems;
     cascadeModRef.current = cascadeModifiers;
+
+    // Zoning compliance for the floating toast
+    const { greenRatio, greenViolation, farWarnings } = getZoningCompliance(grid);
 
     useEffect(() => {
         const g = loadedSave?.grid_state ?? createDefaultGrid();
@@ -156,7 +162,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         fetchPredictions();
     }, [grid]);
 
-    // ── LSTM: collect last 20 traffic values and call endpoint ───────────────
+    // ── LSTM: collect last 20 traffic values ─────────────────────────────────
     useEffect(() => {
         if (metrics.traffic !== undefined && !isNaN(metrics.traffic)) {
             setLastTrafficValues(prev => {
@@ -167,6 +173,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         }
     }, [metrics.traffic]);
 
+    // ── LSTM: call endpoint with time-of-day feature ─────────────────────────
     useEffect(() => {
         if (lastTrafficValues.length === 20) {
             const fetchLSTM = async () => {
@@ -174,11 +181,14 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
                     const res = await fetch('http://localhost:5001/predict_traffic_lstm', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ last_20_traffic: lastTrafficValues })
+                        body: JSON.stringify({
+                            traffic_sequence: lastTrafficValues,
+                            simulated_hour: getSimulatedHour(tickCount),
+                        })
                     });
                     const data = await res.json();
-                    if (data.next_traffic !== undefined) {
-                        setLstmPrediction(Math.round(data.next_traffic));
+                    if (data.predicted_traffic !== undefined) {
+                        setLstmPrediction(Math.round(data.predicted_traffic));
                     } else {
                         setLstmPrediction(null);
                     }
@@ -191,7 +201,7 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         } else {
             setLstmPrediction(null);
         }
-    }, [lastTrafficValues]);
+    }, [lastTrafficValues, tickCount]);
 
     // Autosave
     useEffect(() => {
@@ -271,7 +281,6 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
         <div className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden select-none">
             {showManual && <UserManual onClose={() => setShowManual(false)} />}
 
-            {/* shrink-0 prevents the HUD from shrinking when content grows */}
             <div className="shrink-0">
                 <TopHUD
                     metrics={metrics}
@@ -292,15 +301,23 @@ export default function SmartCitySim({ user, token, loadedSave, onLogout, onBack
 
             <div className="flex-1 flex min-h-0 overflow-hidden">
                 <BuildToolbar selectedTool={selectedTool} onSelectTool={setSelectedTool} />
-                <CityGrid
-                    grid={grid}
-                    onPlaceTile={handlePlaceTile}
-                    selectedTool={selectedTool}
-                    co2Level={metrics.co2}
-                    floodRisk={metrics.floodRisk}
-                    cars={cars}
-                    isRunning={isRunning}
-                />
+                <div className="relative flex-1">
+                    {/* Floating zoning toast appears over the grid */}
+                    <ZoningToast
+                        greenViolation={greenViolation}
+                        greenRatio={greenRatio}
+                        farWarnings={farWarnings}
+                    />
+                    <CityGrid
+                        grid={grid}
+                        onPlaceTile={handlePlaceTile}
+                        selectedTool={selectedTool}
+                        co2Level={metrics.co2}
+                        floodRisk={metrics.floodRisk}
+                        cars={cars}
+                        isRunning={isRunning}
+                    />
+                </div>
                 <div className="hidden md:flex shrink-0">
                     <RightPanel
                         metrics={metrics}
