@@ -41,6 +41,12 @@ instance/
 *.db-shm
 *.db-wal
 
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Python version file (local only)
+.python-version
+
 # IDE
 .vscode/
 .idea/
