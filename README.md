@@ -26,13 +26,13 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 - Interactive 40×40 canvas grid (click/drag placement)
 - Real‑time sustainability dashboard (8 live metrics)
 - IoT policy controls (6 toggles, unlock by scenario)
-- 4‑page user manual with zoning rules
+- 5‑page user manual with Korean zoning rules
 - Responsive auth (split‑screen) and save‑slot pages
 
 ### Backend – Flask REST API
 - `/api/simulate` – Random Forest inference (CO₂, traffic, energy)
 - `/predict` – same RF model for frontend predictions
-- `/predict_traffic_lstm` – LSTM time‑series traffic forecast
+- `/predict_traffic_lstm` – LSTM fine‑tuned on Seoul TOPIS traffic data
 - `/log_data` – collect training data (12,824 rows)
 - `/auth/*` – JWT signup/login, guest mode
 - `/saves` – save/load city states (SQLite)
@@ -46,13 +46,13 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 | Model | Task | Training Data | Performance |
 |-------|------|---------------|-------------|
 | Random Forest (scikit‑learn) | Predict CO₂, traffic, energy from tile counts | 12,824 rows | R²: CO₂ 0.66, Traffic 0.86, Energy 0.999 |
-| LSTM (TensorFlow/Keras) | Predict next traffic value (20‑step lookback) | 23,292 sequences | MSE < 0.01 |
+| LSTM (TensorFlow/Keras) | Predict next traffic value (20‑step lookback) | Seoul TOPIS + fine‑tune | MAE ~5% |
 | Client‑side linear regression | 5‑tick extrapolation (baseline) | – | Runs in browser |
 
 **Frontend ML badges:**  
-- 🤖 *ML +5 turns* – client‑side linear regression  
-- 🤖 *ML Next: CO₂ X% / Traffic Y%* – backend Random Forest  
-- 🧠 *LSTM next traffic: X%* – backend LSTM (updates every 30 ticks)
+- 🤖 *Trend +5* – client‑side linear regression  
+- 🤖 *RF: CO₂ X% / Traffic Y%* – backend Random Forest  
+- 🧠 *LSTM next traffic: X%* – backend LSTM (Seoul‑calibrated)
 
 ---
 
@@ -61,7 +61,7 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 ### Interactive City Builder
 - **40×40 tile grid** (HTML5 Canvas)
 - **8 tile types**: residential, commercial, industrial, park, solar, bus stop, road, erase
-- **Real‑time zoning validation** – RES/COM/IND separation, solar spacing, bus‑road adjacency
+- **Real‑time Korean zoning validation** – industrial‑residential buffer (NLPUA Art.76), commercial road access (Building Act Art.44), solar glare separation, green space ratio (≥5%), FAR warnings (NLPUA Art.78)
 - **Click/drag painting** with red‑flash violation feedback
 
 ### Sustainability Dashboard (8 metrics)
@@ -161,7 +161,9 @@ SmartCitySim/
 │ ├── vite.config.js
 │ └── tailwind.config.js
 ├── .gitignore
-└── README.md 
+└── README.md
+
+text
 
 ---
 
@@ -173,20 +175,21 @@ SmartCitySim/
 - pip
 
 ### Backend Setup
+
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate   # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 python app.py --port 5001
-
-### Frontend Setup
+Frontend Setup
+bash
 cd frontend
 npm install
 npm run dev
 Open http://localhost:5173 – create an account or use guest mode.
 
-Future Work (planned before graduation)
+Future Work (planned after graduation)
 IoT‑aware Random Forest – retrain models with IoT flags (replace hard‑coded multipliers)
 
 Ensemble fusion pipeline – combine RF + LSTM + rules‑based for multi‑model robustness
