@@ -123,45 +123,131 @@ SmartCitySim follows a **client‑server architecture** with ML inference at the
 ---
 
 ## Project Structure (simplified)
-SmartCitySim/
+SmartCitySim-React-Flask/
 ├── backend/
-│ ├── app.py # Flask main + all endpoints
-│ ├── models/ # Trained ML models (.pkl, .h5)
-│ ├── instance/ # SQLite database
-│ ├── requirements.txt
-│ ├── train_rf_full.py # Random Forest training
-│ ├── train_lstm_traffic.py # LSTM training script
-│ ├── prepare_lstm_data.py # Extract time‑series data
-│ └── ...
+│   ├── __pycache__/
+│   ├── instance/
+│   │   └── smartcity.db
+│   ├── models/
+│   │   ├── rf_co2.pkl
+│   │   ├── rf_energy.pkl
+│   │   ├── rf_traffic.pkl
+│   │   ├── traffic_lstm.h5
+│   │   └── traffic_scaler.pkl
+│   ├── app.py
+│   ├── create_db.py
+│   ├── model_co2.pkl
+│   ├── model_traffic.pkl
+│   ├── prepare_lstm_data.py
+│   ├── README_BACKEND.md
+│   ├── requirements.txt
+│   ├── scaler_co2.pkl
+│   ├── scaler_traffic.pkl
+│   ├── smartcity.db
+│   ├── test_requests.py
+│   ├── train_lstm_traffic.py
+│   ├── train_model.py
+│   ├── train_rf_full.py
+│   ├── X_traffic.npy
+│   └── y_traffic.npy
+│
 ├── frontend/
-│ ├── src/
-│ │ ├── api/
-│ │ │ └── smartCityClient.js
-│ │ ├── assets/ # Background images
-│ │ ├── components/
-│ │ │ ├── smartcity/
-│ │ │ │ ├── TopHUD.jsx
-│ │ │ │ ├── BuildToolbar.jsx
-│ │ │ │ ├── CityGrid.jsx
-│ │ │ │ ├── RightPanel.jsx
-│ │ │ │ ├── BottomBar.jsx
-│ │ │ │ ├── SimulationEngine.jsx
-│ │ │ │ ├── ZoningRules.jsx
-│ │ │ │ ├── CarAgents.jsx
-│ │ │ │ └── UserManual.jsx
-│ │ │ └── ui/ # shadcn/ui components
-│ │ ├── pages/
-│ │ │ ├── AuthPage.jsx
-│ │ │ ├── SaveSlotPage.jsx
-│ │ │ └── SmartCitySim.jsx
-│ │ ├── App.jsx
-│ │ ├── index.css
-│ │ └── main.jsx
-│ ├── package.json
-│ ├── vite.config.js
-│ └── tailwind.config.js
+│   ├── node_modules/
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── smartCityClient.js
+│   │   ├── assets/
+│   │   │   ├── saveslot_background.png
+│   │   │   └── smartcity_app_background.png
+│   │   ├── components/
+│   │   │   ├── smartcity/
+│   │   │   │   ├── BottomBar.jsx
+│   │   │   │   ├── BuildToolbar.jsx
+│   │   │   │   ├── CarAgents.jsx
+│   │   │   │   ├── CityGrid.jsx
+│   │   │   │   ├── RightPanel.jsx
+│   │   │   │   ├── SimulationEngine.jsx
+│   │   │   │   ├── TopHUD.jsx
+│   │   │   │   ├── UserManual.jsx
+│   │   │   │   └── ZoningRules.jsx
+│   │   │   │   └── ZoningToast.jsx
+│   │   │   └── ui/
+│   │   │       ├── accordion.jsx
+│   │   │       ├── alert-dialog.jsx
+│   │   │       ├── alert.jsx
+│   │   │       ├── aspect-ratio.jsx
+│   │   │       ├── avatar.jsx
+│   │   │       ├── badge.jsx
+│   │   │       ├── breadcrumb.jsx
+│   │   │       ├── button.jsx
+│   │   │       ├── calendar.jsx
+│   │   │       ├── card.jsx
+│   │   │       ├── carousel.jsx
+│   │   │       ├── chart.jsx
+│   │   │       ├── checkbox.jsx
+│   │   │       ├── collapsible.jsx
+│   │   │       ├── command.jsx
+│   │   │       ├── context-menu.jsx
+│   │   │       ├── dialog.jsx
+│   │   │       ├── drawer.jsx
+│   │   │       ├── dropdown-menu.jsx
+│   │   │       ├── form.jsx
+│   │   │       ├── hover-card.jsx
+│   │   │       ├── input-otp.jsx
+│   │   │       ├── input.jsx
+│   │   │       ├── label.jsx
+│   │   │       ├── menubar.jsx
+│   │   │       ├── navigation-menu.jsx
+│   │   │       ├── pagination.jsx
+│   │   │       ├── popover.jsx
+│   │   │       ├── progress.jsx
+│   │   │       ├── radio-group.jsx
+│   │   │       ├── resizable.jsx
+│   │   │       ├── scroll-area.jsx
+│   │   │       ├── select.jsx
+│   │   │       ├── separator.jsx
+│   │   │       ├── sheet.jsx
+│   │   │       ├── sidebar.jsx
+│   │   │       ├── skeleton.jsx
+│   │   │       ├── slider.jsx
+│   │   │       ├── sonner.jsx
+│   │   │       ├── switch.jsx
+│   │   │       ├── table.jsx
+│   │   │       ├── tabs.jsx
+│   │   │       ├── textarea.jsx
+│   │   │       ├── toast.jsx
+│   │   │       ├── toaster.jsx
+│   │   │       ├── toggle-group.jsx
+│   │   │       ├── toggle.jsx
+│   │   │       ├── tooltip.jsx
+│   │   │       └── use-toast.jsx
+│   │   ├── hooks/
+│   │   │   └── use-mobile.jsx
+│   │   ├── lib/
+│   │   │   └── utils.js
+│   │   ├── pages/
+│   │   │   ├── AuthPage.jsx
+│   │   │   ├── SaveSlotPage.jsx
+│   │   │   └── SmartCitySim.jsx
+│   │   ├── utils/
+│   │   │   └── index.ts
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── .gitignore
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── README.md
+│   ├── tailwind.config.js
+│   ├── toaster.jsx
+│   └── vite.config.js
+│
 ├── .gitignore
 └── README.md
+
 
 ---
 
