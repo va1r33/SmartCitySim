@@ -30,7 +30,7 @@ const GOAL_COLORS = {
     'Happiness': '#f9a8d4',    // pink-300
 };
 
-// ── Sticky Mandate Banner (coloured progress & text per scenario) ───────────
+// ── Sticky Mandate Banner (medium gray background, no blur) ─────────────────
 function StickyMandateBanner({ currentLevel, mandateItems, achieved, scenarioColor }) {
     const [expanded, setExpanded] = useState(true);
     const done = mandateItems.filter(i => i.ok).length;
@@ -38,28 +38,28 @@ function StickyMandateBanner({ currentLevel, mandateItems, achieved, scenarioCol
     const pct = Math.round((done / total) * 100);
 
     return (
-        <div className="sticky top-0 z-30 bg-slate-100/80 backdrop-blur-sm border-b border-slate-200 shadow-sm rounded-b-xl">
+        <div className="sticky top-0 z-30 bg-gray-200 border-b border-gray-300 shadow-sm rounded-b-xl">
             <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
-                <Target className="w-3 h-3 text-slate-500 shrink-0" />
+                <Target className="w-3 h-3 text-gray-500 shrink-0" />
                 <span className="text-[11px] font-semibold tracking-tight truncate flex-1" style={{ color: scenarioColor.hex }}>
                     {currentLevel.title}
                 </span>
                 <button
                     onClick={() => setExpanded(e => !e)}
-                    className="w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition-colors shrink-0"
+                    className="w-5 h-5 rounded-full bg-gray-300 hover:bg-gray-400 flex items-center justify-center transition-colors shrink-0"
                 >
-                    {expanded ? <ChevronUp className="w-2.5 h-2.5 text-slate-600" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-600" />}
+                    {expanded ? <ChevronUp className="w-2.5 h-2.5 text-gray-600" /> : <ChevronDown className="w-2.5 h-2.5 text-gray-600" />}
                 </button>
             </div>
 
             <div className="px-4 pt-0.5 pb-2.5">
                 <div className="flex justify-between items-center mb-1">
-                    <span className="text-[8.5px] text-slate-500 font-bold uppercase tracking-widest">Progress</span>
+                    <span className="text-[8.5px] text-gray-500 font-bold uppercase tracking-widest">Progress</span>
                     <span className="text-[10px] font-semibold" style={{ color: scenarioColor.hex }}>
                         {done}/{total} goals{achieved ? ' ✓' : ''}
                     </span>
                 </div>
-                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-gray-300 rounded-full overflow-hidden">
                     <div
                         className="h-full rounded-full transition-all duration-700"
                         style={{ width: `${pct}%`, background: scenarioColor.hex }}
@@ -74,9 +74,9 @@ function StickyMandateBanner({ currentLevel, mandateItems, achieved, scenarioCol
                         <p className="text-[9px] text-amber-800 leading-relaxed">💡 {currentLevel.tip}</p>
                     </div>
                     {achieved && (
-                        <div className="flex items-center justify-center gap-2 py-2 bg-slate-200 border border-slate-300 rounded-xl mt-1">
-                            <CheckCircle2 className="w-3 h-3 text-slate-600" />
-                            <span className="text-[10px] font-semibold text-slate-700">Mandate Achieved</span>
+                        <div className="flex items-center justify-center gap-2 py-2 bg-gray-300 border border-gray-400 rounded-xl mt-1">
+                            <CheckCircle2 className="w-3 h-3 text-gray-600" />
+                            <span className="text-[10px] font-semibold text-gray-700">Mandate Achieved</span>
                         </div>
                     )}
                 </div>
@@ -85,8 +85,8 @@ function StickyMandateBanner({ currentLevel, mandateItems, achieved, scenarioCol
             {!expanded && (
                 <div className="flex flex-wrap gap-1 px-3 pb-2.5">
                     {mandateItems.map(item => (
-                        <span key={item.label} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-medium ${item.ok ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {item.ok ? <CheckCircle2 className="w-2 h-2 text-slate-500" /> : <XCircle className="w-2 h-2 text-slate-400" />}
+                        <span key={item.label} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-medium ${item.ok ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {item.ok ? <CheckCircle2 className="w-2 h-2 text-gray-500" /> : <XCircle className="w-2 h-2 text-gray-400" />}
                             {item.label}
                         </span>
                     ))}
@@ -99,24 +99,23 @@ function StickyMandateBanner({ currentLevel, mandateItems, achieved, scenarioCol
 // ── Banner Goal Card – uses muted metric colours for incomplete goals ───────
 function BannerGoalCard({ item }) {
     const pct = Math.min(100, (item.value / Math.max(1, item.target)) * 100);
-    // Use the metric's muted colour for incomplete goals; grey for completed
     const barColor = item.ok ? '#d1d5db' : (GOAL_COLORS[item.label] || '#cbd5e1');
     return (
-        <div className={`px-2.5 py-2 rounded-xl border transition-all duration-300 ${item.ok ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-150'}`}>
+        <div className={`px-2.5 py-2 rounded-xl border transition-all duration-300 ${item.ok ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-150'}`}>
             <div className="flex items-center gap-2 mb-1">
-                {item.ok ? <CheckCircle2 className="w-2.5 h-2.5 text-slate-500 shrink-0" /> : <XCircle className="w-2.5 h-2.5 text-slate-400 shrink-0" />}
-                <span className={`text-[9.5px] font-semibold flex-1 ${item.ok ? 'text-slate-700' : 'text-slate-600'}`}>{item.label}:</span>
-                <span className={`text-[10.5px] font-bold tabular-nums ${item.ok ? 'text-slate-800' : 'text-slate-700'}`}>{item.value}{item.unit}</span>
-                <span className="text-[8px] text-slate-400 shrink-0 ml-1">{item.reverse ? `≥${item.target}` : `/${item.target}${item.unit}`}</span>
+                {item.ok ? <CheckCircle2 className="w-2.5 h-2.5 text-gray-500 shrink-0" /> : <XCircle className="w-2.5 h-2.5 text-gray-400 shrink-0" />}
+                <span className={`text-[9.5px] font-semibold flex-1 ${item.ok ? 'text-gray-700' : 'text-gray-600'}`}>{item.label}:</span>
+                <span className={`text-[10.5px] font-bold tabular-nums ${item.ok ? 'text-gray-800' : 'text-gray-700'}`}>{item.value}{item.unit}</span>
+                <span className="text-[8px] text-gray-400 shrink-0 ml-1">{item.reverse ? `≥${item.target}` : `/${item.target}${item.unit}`}</span>
             </div>
-            <div className="h-0.5 bg-slate-200 rounded-full overflow-hidden">
+            <div className="h-0.5 bg-gray-200 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
             </div>
         </div>
     );
 }
 
-// ── City Score Strip (coloured progress bar, score, status per scenario) ────
+// ── City Score Strip ───────────────────────────────────────────
 function CityScoreStrip({ score, scenarioColor }) {
     let labelText = '';
     if (score >= 80) labelText = 'Excellent';
@@ -124,8 +123,15 @@ function CityScoreStrip({ score, scenarioColor }) {
     else if (score >= 40) labelText = 'Fair';
     else labelText = 'Needs Work';
 
+    const glowColor = '#9ca3af'; // gray-400 – subtle white/gray glow
+
     return (
-        <div className="flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-2xl shadow-md">
+        <div
+            className="flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-2xl transition-all duration-300"
+            style={{
+                boxShadow: `0 4px 12px -2px ${glowColor}40, 0 0 12px 0 ${glowColor}30`,
+            }}
+        >
             <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
                 <TrendingUp className="w-3.5 h-3.5 text-gray-500" />
             </div>
@@ -148,7 +154,7 @@ function CityScoreStrip({ score, scenarioColor }) {
     );
 }
 
-// ── Section Header (unchanged) ─────────────────────────────────────────────
+// ── Section Header ─────────────────────────────────────────────
 function SectionHeader({ label, right }) {
     return (
         <div className="flex items-center gap-2 mb-3">
@@ -159,7 +165,7 @@ function SectionHeader({ label, right }) {
     );
 }
 
-// ── Metric Row (muted, desaturated colours – unchanged) ────────────────────
+// ── Metric Row (muted, desaturated colours) ─────────────────────────────────
 const METRIC_COLORS = {
     co2: { bg: 'bg-rose-100/50', icon: 'text-rose-400', bar: 'bg-rose-300' },
     traffic: { bg: 'bg-amber-100/50', icon: 'text-amber-500', bar: 'bg-amber-300' },
@@ -193,7 +199,7 @@ function MetricRow({ metricKey, icon: Icon, label, value, unit, pct }) {
     );
 }
 
-// ── Cascade Badge (unchanged) ──────────────────────────────────────────────
+// ── Cascade Badge ──────────────────────────────────────────────
 function CascadeBadge({ event }) {
     if (!event) return null;
     return (
@@ -207,7 +213,7 @@ function CascadeBadge({ event }) {
     );
 }
 
-// ── IoT Grid (unchanged) ───────────────────────────────────────────────────
+// ── IoT Grid ───────────────────────────────────────────────────
 const IOT_ICONS = {
     ecoMode: Leaf, smartTraffic: Car, publicAwareness: Megaphone,
     emergencyBroadcast: Siren, smartGrid: Zap, predictiveOptimization: BrainCircuit,
@@ -235,7 +241,7 @@ function IoTGrid({ iotSystems, onToggle, currentLevel }) {
     );
 }
 
-// ── Zoning Compliance Panel (unchanged) ────────────────────────────────────
+// ── Zoning Compliance Panel ────────────────────────────────────
 const CODE_LABELS = {
     'KR-NLPUA-76': 'Buffer Zone · NLPUA Art. 76',
     'KR-BA-44': 'Road Access · Building Act Art. 44',
@@ -288,7 +294,7 @@ function ZoningPanel({ grid }) {
     );
 }
 
-// ── District Grid (unchanged) ──────────────────────────────────────────────
+// ── District Grid ──────────────────
 function DistrictGrid({ counts }) {
     const TILES = [
         { label: 'Res', key: 'residential' }, { label: 'Com', key: 'commercial' },
@@ -314,7 +320,7 @@ function DistrictGrid({ counts }) {
     );
 }
 
-// ── Hint Ticker (unchanged) ────────────────────────────────────────────────
+// ── Hint Ticker ────────────────────────────────────────────────
 function HintTicker({ hints }) {
     const [idx, setIdx] = useState(0);
     const [visible, setVisible] = useState(true);
@@ -391,10 +397,11 @@ export default function RightPanel({ metrics, iotSystems, onToggle, currentLevel
 
                 <ZoningPanel grid={grid} />
 
-                <div className="p-4 border-t border-gray-300 bg-gray-200">
+                {/* ── Districts section – now dark gray (like Bus Stop card) ── */}
+                <div className="p-4 border-t border-gray-400 bg-gray-300">
                     <SectionHeader label="Districts" />
                     <DistrictGrid counts={counts} />
-                    <p className="text-[8.5px] text-gray-600 text-center font-medium mt-2">{district} districts · {counts.road} roads</p>
+                    <p className="text-[8.5px] text-gray-700 text-center font-medium mt-2">{district} districts · {counts.road} roads</p>
                 </div>
 
                 <HintTicker hints={hints} />
